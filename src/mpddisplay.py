@@ -1,9 +1,10 @@
 #!/usr/bin/python
 
 # Check with an MPD server and print the current song on the console.
-# Eventually, we'd like to have a fancy curses display which shows the
-# current song, the time remaining for the current song and the next
-# song.
+# Has a fancy curses display which shows the current song, the time
+# remaining for the current song.
+
+# $Id$
 
 from mpd import MPDClient, MPDError, CommandError
 from datetime import timedelta
