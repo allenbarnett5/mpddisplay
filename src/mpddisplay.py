@@ -4,8 +4,6 @@
 # Has a fancy curses display which shows the current song, the time
 # remaining for the current song.
 
-# $Id$
-
 from mpd import MPDClient, MPDError, CommandError
 from datetime import timedelta
 import curses
@@ -96,12 +94,28 @@ class MPDPoller ( object ):
         if song != self._current:
             self._songwin.clear()
             song_str = ''
-            if ( 'artist' in song ):
-                song_str += song['artist']
-            if ( 'album' in song ):
-                song_str += '\n' + song['album']
-            if ( 'title' in song ):
-                song_str += '\n' + song['title']
+            # Somewhere along the line, my text fields picked up some
+            # kind of hyphen which causes MPDClient to convert strings
+            # into lists, broken at the hyphen character. So, if we
+            # get a list, recombine it with hyphens.
+            if 'artist' in song:
+                if type( song['artist'] ) is list:
+                    artist = ' - '.join( song['artist'] )
+                else:
+                    artist = song['artist']
+                song_str += artist
+            if 'album' in song:
+                if type( song['album'] ) is list:
+                    album = ' - '.join( song['album'] )
+                else:
+                    album = song['album']
+                song_str += '\n' + album
+            if 'title' in song:
+                if type( song['title'] ) is list:
+                    title = ' - '.join( song['title'] )
+                else:
+                    title = song['title']
+                song_str += '\n' + title
             self._songwin.addstr( song_str )
             self._time_line = min( self._songwin.getyx()[0]+1, self.max_y-3 )
             self._songwin.refresh()
