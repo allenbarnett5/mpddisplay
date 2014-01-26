@@ -159,7 +159,6 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
 
   int n_read;
   char buffer[1024];
-  bool has_current_song = false;
 
   struct MPD_CURRENT current;
   mpd_current_init( &current );
@@ -217,11 +216,6 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
       }
       continue;
     }
-#if 0
-    else if ( n_read > 4 && strncmp( "song:", buffer, 5 ) == 0 ) {
-      has_current_song = true;
-    }
-#endif
   }
 
   if ( n_read == -1 ) {
@@ -255,24 +249,7 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
     previous->play_status = current.play_status;
     previous->changed |= MPD_CHANGED_STATUS;
   }
-#if 0
-  // This is the tricky bit since effectively there is nothing to
-  // display if there is no song playing. Since we didn't issue the
-  // "currentsong" command separately from "status", it's hard to
-  // tell if anything has changed. "song:" is part of the "status"
-  // command.
-  if ( ! has_current_song && current->play_status != MPD_PLAY_STATUS_NOSONG ) {
-    current->play_status = MPD_PLAY_STATUS_NOSONG;
-    firestring_estr_astrcpy( &current->artist, "" );
-    firestring_estr_astrcpy( &current->album, "" );
-    firestring_estr_astrcpy( &current->title, "" );
-    current->elapsed_time = 0;
-    current->total_time = 0;
-    current->changed |=
-      MPD_CHANGED_ARTIST | MPD_CHANGED_ALBUM | MPD_CHANGED_TITLE |
-      MPD_CHANGED_ELAPSED | MPD_CHANGED_TOTAL | MPD_CHANGED_STATUS;
-  }
-#endif
+
   mpd_current_free( &current ); // This is something of an annoyance.
 
   return 0;
