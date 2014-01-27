@@ -11,9 +11,10 @@
 #include <time.h>
 
 #include "mpd_intf.h"
+#include "display_intf.h"
 
-int convert_int ( const char* string );
-int idle ( int seconds );
+static int convert_int ( const char* string );
+static int idle ( int seconds );
 
 const char* USAGE = "usage: %s [--host hostname] [--port port#]\n";
 
@@ -82,6 +83,14 @@ int main ( int argc, char* argv[] )
     return 1;
   }
 
+  // If we get this far, we can try to initialize the graphics.
+
+  int ret = display_init();
+
+  if ( ret == -1 ) {
+    return 1;
+  }
+
   // Well, after all that, we can now start polling MPD to see what's up.
 
   struct MPD_CURRENT current;
@@ -132,7 +141,7 @@ int main ( int argc, char* argv[] )
  * \return the integer. If errno is not 0, then the value is
  * indeterminate.
  */
-int convert_int ( const char* string )
+static int convert_int ( const char* string )
 {
   errno = 0;
   char* tail;
@@ -151,7 +160,7 @@ int convert_int ( const char* string )
  * a remote possibility that this could fail. Indicates a programming
  * error probably.
  */
-int idle ( int seconds )
+static int idle ( int seconds )
 {
   // I guess this is a best effort. If it fails, we just keep
   // trying.
