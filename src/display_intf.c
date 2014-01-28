@@ -48,15 +48,17 @@ static const VGfloat vc_frame_height = 461.f;
 // Background color and alpha
 static const VGfloat background[] = { 0.f, 0.f, 0.f, 1.f };
 // Frame color (although this will eventually be a texture).
-static VGfloat frame_color[] = { 0., 0.7f, 0.7f, 1. };
+static VGfloat frame_color[] = { 0., 1.f, 0.f, 1. };
 
 // The size of border decoration in mm.
 static const VGfloat border_thickness = 2.f;
 // Fraction of the screen to devote to the text box.
 static const VGfloat text_scale = 0.5f;
+// Space between the border and the text (units?)
+static const VGfloat text_gutter = 1.f;
 
 // The basic height of the font in mm.
-static const VGfloat font_size_mm = 16.f;
+static const VGfloat font_size_mm = 4.f;
 
 int display_init ( const char* font_file )
 {
@@ -303,6 +305,14 @@ int display_init ( const char* font_file )
     return -1;
   }
 
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
+  vgLoadIdentity();
+  vgTranslate( vc_frame_x + border_thickness * vc_frame_width / tv_width
+	       + text_gutter,
+	       window_height - border_thickness * vc_frame_height / tv_height
+	       - (40.f + text_gutter ) );
+  vgScale( 1.f, 1.f );
+
   return 0;
 }
 
@@ -311,17 +321,18 @@ int display_update ( const struct MPD_CURRENT* current )
   // For now, this is very simple. Redraw the whole screen.
 
   vgClear( 0, 0, window_width, window_height );
-#if 0
+
   vgDrawPath( frame_path, VG_FILL_PATH );
-#endif
+
+  vg_font_string_eval( font, &current->artist );
+  vg_font_draw_string( font, 0.f, 0.f, &current->artist );
+  vg_font_string_eval( font, &current->album );
+  vg_font_draw_string( font, 0.f, -38.f, &current->album );
+  vg_font_string_eval( font, &current->title );
+  vg_font_draw_string( font, 0.f, -76.f, &current->title );
 #if 0
   if ( current->changed & MPD_CHANGED_ARTIST ) {
-#endif
-    vg_font_string_eval( font, &current->artist );
-    vg_font_draw_string( font, 0.f, 0.f,  &current->artist );
-#if 0
   }
-#endif
   if ( current->changed & MPD_CHANGED_ALBUM ) {
   }
   if ( current->changed & MPD_CHANGED_TITLE ) {
@@ -332,7 +343,7 @@ int display_update ( const struct MPD_CURRENT* current )
   }
   if ( current->changed & MPD_CHANGED_STATUS ) {
   }
-
+#endif
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
 
   if ( swapped == EGL_FALSE ) {

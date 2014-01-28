@@ -20,7 +20,7 @@ static int idle ( int seconds );
 const char* USAGE = "usage: %s [--host hostname] [--port port#]\n";
 
 // \bug Probably should let the user choose.
-const char* MPD_DISPLAY_FONT = "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSansMono.ttf";
+const char* MPD_DISPLAY_FONT = "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf";
 
 int main ( int argc, char* argv[] )
 {

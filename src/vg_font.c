@@ -8,6 +8,7 @@
 #include FT_FREETYPE_H
 #include "firestring.h"
 #include "VG/openvg.h"
+#include "VG/vgu.h"
 
 #include "vg_font.h"
 
@@ -37,14 +38,14 @@ struct VG_FONT_HANDLE* vg_font_init ( const char* font_file,
   struct VG_FONT_HANDLE* handle = malloc( sizeof( struct VG_FONT_HANDLE ) );
 
   if ( handle == NULL ) {
-    printf( "Out of memory for font handle\n" );
+    printf( "Error: Out of memory for font handle\n" );
     return NULL;
   }
 
   handle->d = malloc( sizeof( struct VG_FONT_PRIVATE ) );
 
   if ( handle->d == NULL ) {
-    printf( "Out of memory for font handle private object\n" );
+    printf( "Error: Out of memory for font handle private object\n" );
     free( handle );
     return NULL;
   }
@@ -56,7 +57,7 @@ struct VG_FONT_HANDLE* vg_font_init ( const char* font_file,
   error = FT_Init_FreeType( &handle->d->library );
 
   if ( error != 0 ) {
-    printf( "Could not initialize the FreeType library: %d\n", error );
+    printf( "Error: Could not initialize the FreeType library: %d\n", error );
     vg_font_free_handle( handle );
     return NULL;
   }
@@ -64,8 +65,8 @@ struct VG_FONT_HANDLE* vg_font_init ( const char* font_file,
   error = FT_New_Face( handle->d->library, font_file, 0, &handle->d->face );
 
   if ( error != 0 ) {
-    printf( "Could not load the face from file: %s, error %d\n", font_file,
-	    error );
+    printf( "Error: Could not load the face from file: %s, error %d\n",
+	    font_file, error );
     vg_font_free_handle( handle );
     return NULL;
   }
@@ -76,7 +77,7 @@ struct VG_FONT_HANDLE* vg_font_init ( const char* font_file,
   handle->d->utf8_utf32 = iconv_open( "UTF-32LE", "UTF-8" );
 
   if ( handle->d->utf8_utf32 == (iconv_t)-1) {
-    printf( "Could not create UTF-8 to UTF-32 converter: %s\n",
+    printf( "Error: Could not create UTF-8 to UTF-32 converter: %s\n",
 	    strerror( errno ) );
     // \bug close the freetype stuff, too.
     vg_font_free_handle( handle );
@@ -119,11 +120,9 @@ int vg_font_string_eval ( struct VG_FONT_HANDLE* handle,
       int word_i = word / N_WORDS;
       int bit_i  = 1 << ( word & 0x7 );
       if ( handle->d->has_vg_glyph[block][word_i] & bit_i ) {
-	printf( "Has glyph for U+%04x\n", utf32[c] );
       }
       else {
 	handle->d->has_vg_glyph[block][word_i] |= bit_i;
-	printf( "Set bit for glyph for U+%04x\n", utf32[c] );
 	add_char( handle->d->font, handle->d->face, utf32[c] );
       }
     }
@@ -165,6 +164,7 @@ void vg_font_draw_string ( struct VG_FONT_HANDLE* handle,
 
 void vg_font_free_handle ( struct VG_FONT_HANDLE* handle )
 {
+  vgDestroyFont( handle->d->font );
   free( handle->d );
   free( handle );
 }
@@ -307,9 +307,11 @@ static void add_char ( VGFont font, FT_Face face, FT_ULong c )
   FT_Outline *outline = &face->glyph->outline;
 
   VGPath path;
+  path = vgCreatePath( VG_PATH_FORMAT_STANDARD, VG_PATH_DATATYPE_F,
+		       1.f, 0.f, 0, 0, VG_PATH_CAPABILITY_ALL );
+  // It could be a blank. If any character doesn't have a glyph,
+  // nothing is drawn by vgDrawGlyphs.
   if ( outline->n_contours > 0 ) {
-    path = vgCreatePath( VG_PATH_FORMAT_STANDARD, VG_PATH_DATATYPE_F,
-			 1.f, 0.f, 0, 0, VG_PATH_CAPABILITY_ALL );
     convert_outline( outline->points, outline->tags, outline->contours,
 		     outline->n_contours, outline->n_points );
     vgAppendPathData( path, segments_count, segments, coords );
