@@ -25,6 +25,7 @@ enum MPD_CHANGED {
   MPD_CHANGED_ELAPSED = 0x08,
   MPD_CHANGED_TOTAL   = 0x10,
   MPD_CHANGED_STATUS  = 0x20,
+  MPD_CHANGED_ANY     = 0xff, //!< Has anything changed?
 };
 /*!
  * This is the structure which is populated by mpd_get_current method.

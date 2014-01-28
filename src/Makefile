@@ -4,8 +4,8 @@ CFLAGS = -g -Wall -Wextra -MMD \
 -I/opt/vc/include/interface/vmcs_host/linux
 
 mpddisplay: main.o mpd_intf.o display_intf.o
-	gcc -o mpddisplay main.o mpd_intf.o display_intf.o -lfirestring \
--L /opt/vc/lib -lGLESv2
+	gcc -o mpddisplay main.o mpd_intf.o display_intf.o \
+-L /opt/vc/lib -lGLESv2 -lfirestring
 
 clean:
 	rm main.o mpd_intf.o display_intf.o mpddisplay

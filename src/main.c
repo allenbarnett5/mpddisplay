@@ -9,6 +9,7 @@
 #include <getopt.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "mpd_intf.h"
 #include "display_intf.h"
@@ -94,12 +95,12 @@ int main ( int argc, char* argv[] )
   // Well, after all that, we can now start polling MPD to see what's up.
 
   struct MPD_CURRENT current;
-
   mpd_current_init( &current );
 
   int status = 0;
 
   while ( status == 0 ) {
+
     if( idle( 1 ) < 0 ) {
       printf( "Error: Failed to sleep: %s\n", strerror( errno ) );
     }
@@ -126,9 +127,20 @@ int main ( int argc, char* argv[] )
 	firestring_printf( "new status: %d\n", current.play_status );
       }
     }
+    else {
+      return 1;
+    }
+
+    if ( current.changed & MPD_CHANGED_ANY ) {
+      if ( display_update( &current ) < 0 ) {
+	return 1;
+      }
+    }
   }
 
   mpd_close( mpd );
+
+  display_close();
 
   return 0;
 }
