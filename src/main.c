@@ -111,6 +111,7 @@ int main ( int argc, char* argv[] )
     status = mpd_get_current( mpd, &current );
 
     if ( status == 0 ) {
+#if 0
       if ( current.changed & MPD_CHANGED_ARTIST ) {
 	firestring_printf( "new artist: '%e'\n", &current.artist );
       }
@@ -129,6 +130,7 @@ int main ( int argc, char* argv[] )
       if ( current.changed & MPD_CHANGED_STATUS ) {
 	firestring_printf( "new status: %d\n", current.play_status );
       }
+#endif
     }
     else {
       return 1;

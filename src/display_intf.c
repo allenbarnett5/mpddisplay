@@ -330,6 +330,18 @@ int display_update ( const struct MPD_CURRENT* current )
   vg_font_draw_string( font, 0.f, -38.f, &current->album );
   vg_font_string_eval( font, &current->title );
   vg_font_draw_string( font, 0.f, -76.f, &current->title );
+
+  struct firestring_estr_t t_buf;
+  firestring_estr_alloc( &t_buf, 32 );
+
+  firestring_estr_sprintf( &t_buf, "%02d:%02d / %02d:%02d",
+			   current->elapsed_time / 60,
+			   current->elapsed_time % 60,
+			   current->total_time / 60,
+			   current->total_time % 60 );
+  vg_font_string_eval( font, &t_buf );
+  vg_font_draw_string( font, 0.f, -114.f, &t_buf );
+  firestring_estr_free( &t_buf );
 #if 0
   if ( current->changed & MPD_CHANGED_ARTIST ) {
   }
