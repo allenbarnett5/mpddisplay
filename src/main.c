@@ -19,6 +19,9 @@ static int idle ( int seconds );
 
 const char* USAGE = "usage: %s [--host hostname] [--port port#]\n";
 
+// \bug Probably should let the user choose.
+const char* MPD_DISPLAY_FONT = "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSansMono.ttf";
+
 int main ( int argc, char* argv[] )
 {
   // We have to be told where MPD is running.
@@ -86,7 +89,7 @@ int main ( int argc, char* argv[] )
 
   // If we get this far, we can try to initialize the graphics.
 
-  int ret = display_init();
+  int ret = display_init( MPD_DISPLAY_FONT );
 
   if ( ret == -1 ) {
     return 1;

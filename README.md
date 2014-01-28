@@ -8,6 +8,7 @@ have to have installed a massive number of -dev dependencies including:
 
 * libfirestring-dev
 * libraspberrypi0
+* libfreetype6-dev
 * ... more to come ...
 
 (Still trying to get the hang of Git and Markdown.)

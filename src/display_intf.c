@@ -11,6 +11,7 @@
 #include "VG/vgu.h"
 
 #include "mpd_intf.h"
+#include "vg_font.h"
 #include "display_intf.h"
 
 static const char* egl_carp ( void );
@@ -25,7 +26,9 @@ static EGL_DISPMANX_WINDOW_T native_window;
 static int window_width = 0;
 static int window_height = 0;
 static VGPath frame_path;
+static struct VG_FONT_HANDLE* font;
 
+const VGfloat INCH_PER_MM = 1.f / 25.4f;
 
 // Rather than burying these in the code, here are some constants
 // which we can play with to make the screen look better.
@@ -39,11 +42,11 @@ static const VGfloat tv_width = 95.25f;
 // Approximate height of *my* TV in mm
 static const VGfloat tv_height = 53.975f;
 // Approximate # of visible NTSC DISPMANX pixels on *my* TV
-static const VGfloat vc_frame_width = 698;
+static const VGfloat vc_frame_width = 698.f;
 // Approximate # of visible NTSC DISPMANX lines on *my* TV
-static const VGfloat vc_frame_height = 461;
+static const VGfloat vc_frame_height = 461.f;
 // Background color and alpha
-static const VGfloat background[] = { 0.7f, 0.7f, 0.f, 1.f };
+static const VGfloat background[] = { 0.f, 0.f, 0.f, 1.f };
 // Frame color (although this will eventually be a texture).
 static VGfloat frame_color[] = { 0., 0.7f, 0.7f, 1. };
 
@@ -52,7 +55,10 @@ static const VGfloat border_thickness = 2.f;
 // Fraction of the screen to devote to the text box.
 static const VGfloat text_scale = 0.5f;
 
-int display_init ( void )
+// The basic height of the font in mm.
+static const VGfloat font_size_mm = 16.f;
+
+int display_init ( const char* font_file )
 {
   // There is a lot which can go wrong here. But evidently this can't
   // fail!
@@ -287,8 +293,13 @@ int display_init ( void )
     return -1;
   }
 
-  if ( eglGetError() != EGL_SUCCESS ) {
-    printf( "Error: EGL Couldn't swap EGL buffers: %s\n", egl_carp() );
+  // And get a font.
+
+  font = vg_font_init( font_file, font_size_mm,
+		       vc_frame_width / ( tv_width * INCH_PER_MM ),
+		       vc_frame_height / ( tv_height * INCH_PER_MM ) );
+
+  if ( font == NULL ) {
     return -1;
   }
 
@@ -300,8 +311,27 @@ int display_update ( const struct MPD_CURRENT* current )
   // For now, this is very simple. Redraw the whole screen.
 
   vgClear( 0, 0, window_width, window_height );
-
+#if 0
   vgDrawPath( frame_path, VG_FILL_PATH );
+#endif
+#if 0
+  if ( current->changed & MPD_CHANGED_ARTIST ) {
+#endif
+    vg_font_string_eval( font, &current->artist );
+    vg_font_draw_string( font, 0.f, 0.f,  &current->artist );
+#if 0
+  }
+#endif
+  if ( current->changed & MPD_CHANGED_ALBUM ) {
+  }
+  if ( current->changed & MPD_CHANGED_TITLE ) {
+  }
+  if ( current->changed & MPD_CHANGED_ELAPSED ) {
+  }
+  if ( current->changed & MPD_CHANGED_TOTAL ) {
+  }
+  if ( current->changed & MPD_CHANGED_STATUS ) {
+  }
 
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
 
@@ -316,6 +346,8 @@ int display_update ( const struct MPD_CURRENT* current )
 int display_close ( void )
 {
   eglTerminate( egl_display );
+
+  vg_font_free_handle( font );
 
   return 0;
 }
