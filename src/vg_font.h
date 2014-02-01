@@ -24,7 +24,11 @@ struct VG_FONT_HANDLE {
  */
 struct VG_FONT_HANDLE* vg_font_init ( const char* font_file,
 				      float size, float dpi_x, float dpi_y );
-
+/*!
+ * \return the line spacing for the font (at the current size).
+ */
+float vg_font_line_height ( struct VG_FONT_HANDLE* font );
+#if 0
 /*!
  * Evaluate the string. Not sure what this is going to entail. I'm guessing:
  * * Convert to UTF-32.
@@ -34,7 +38,7 @@ struct VG_FONT_HANDLE* vg_font_init ( const char* font_file,
  */
 int vg_font_string_eval ( struct VG_FONT_HANDLE* font,
 			  const struct firestring_estr_t* string );
-
+#endif
 /*!
  * Draw the string.
  * \param font font info.

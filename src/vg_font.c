@@ -12,6 +12,11 @@
 
 #include "vg_font.h"
 
+static VGfloat float_from_26_6( FT_Pos x )
+{
+   return (VGfloat)x / 64.0f;
+}
+
 // This is the number of UNICODE "blocks" we expect to have to
 // draw glyphs for. I've surveyed my audio files and there are
 // no glyphs above U+07ff. So, this plus 256 bits per "block"
@@ -89,6 +94,12 @@ struct VG_FONT_HANDLE* vg_font_init ( const char* font_file,
   return handle;
 }
 
+float vg_font_line_height ( struct VG_FONT_HANDLE* handle )
+{
+  return float_from_26_6( handle->d->face->size->metrics.height );
+}
+
+#if 0
 int vg_font_string_eval ( struct VG_FONT_HANDLE* handle,
 			  const struct firestring_estr_t* string )
 {
@@ -135,12 +146,11 @@ int vg_font_string_eval ( struct VG_FONT_HANDLE* handle,
   free( utf32 );
   return 0;
 }
-
+#endif
 void vg_font_draw_string ( struct VG_FONT_HANDLE* handle,
 			   float x, float y,
 			   const struct firestring_estr_t* string )
 {
-  // Well, we have to repeat the conversion.
   char* in = string->s;
   size_t n_in = string->l;
   size_t utf32_size = sizeof(uint32_t) * n_in; // Guess this is enough.
@@ -153,7 +163,26 @@ void vg_font_draw_string ( struct VG_FONT_HANDLE* handle,
     // Well, if errno == E2BIG, we could try again with a bigger
     // buffer, otherwise this is a bit hopeless.
   }
+
   size_t n_char = ( utf32_size - n_out ) / 4;
+  size_t c;
+  for ( c = 0; c < n_char; c++ ) {
+    int block = utf32[c] >> 8;
+    int word  = utf32[c] & 0xff;
+    if ( block < N_BLOCKS ) {
+      int word_i = word / N_WORDS;
+      int bit_i  = 1 << ( word & 0x7 );
+      if ( handle->d->has_vg_glyph[block][word_i] & bit_i ) {
+      }
+      else {
+	handle->d->has_vg_glyph[block][word_i] |= bit_i;
+	add_char( handle->d->font, handle->d->face, utf32[c] );
+      }
+    }
+    else {
+      // Switch to undefined character?
+    }
+  }
 
   VGfloat point[2] = { x, y };
   vgSetfv( VG_GLYPH_ORIGIN, 2, point );
@@ -177,10 +206,6 @@ static VGubyte segments[SEGMENTS_COUNT_MAX];
 static VGuint coords_count;
 static VGfloat coords[COORDS_COUNT_MAX];
 
-static VGfloat float_from_26_6( FT_Pos x )
-{
-   return (VGfloat)x / 64.0f;
-}
 
 // \bug unless we replace these arrays with vectors, we must
 // restore the assertions in some form.

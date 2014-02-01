@@ -165,6 +165,8 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
 
   errno = 0;
   while ( ( n_read = read_line( mpd, buffer, sizeof buffer ) ) != -1 ) {
+    // \bug if n_read == 0, then we got EOF on the socket. Which is kind of
+    // an error...
 #if 0
     printf( "SR: %s", buffer );
 #endif

@@ -27,6 +27,7 @@ static int window_width = 0;
 static int window_height = 0;
 static VGPath frame_path;
 static struct VG_FONT_HANDLE* font;
+static VGfloat line_height = 0;
 
 const VGfloat INCH_PER_MM = 1.f / 25.4f;
 
@@ -58,7 +59,7 @@ static const VGfloat text_scale = 0.5f;
 static const VGfloat text_gutter = 1.f;
 
 // The basic height of the font in mm.
-static const VGfloat font_size_mm = 4.f;
+static const VGfloat font_size_mm = 3.f;
 
 int display_init ( const char* font_file )
 {
@@ -305,12 +306,14 @@ int display_init ( const char* font_file )
     return -1;
   }
 
+  line_height = vg_font_line_height( font ) ;
+
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
   vgLoadIdentity();
   vgTranslate( vc_frame_x + border_thickness * vc_frame_width / tv_width
 	       + text_gutter,
 	       window_height - border_thickness * vc_frame_height / tv_height
-	       - (40.f + text_gutter ) );
+	       - (line_height + text_gutter ) );
   vgScale( 1.f, 1.f );
 
   return 0;
@@ -324,12 +327,9 @@ int display_update ( const struct MPD_CURRENT* current )
 
   vgDrawPath( frame_path, VG_FILL_PATH );
 
-  vg_font_string_eval( font, &current->artist );
   vg_font_draw_string( font, 0.f, 0.f, &current->artist );
-  vg_font_string_eval( font, &current->album );
-  vg_font_draw_string( font, 0.f, -38.f, &current->album );
-  vg_font_string_eval( font, &current->title );
-  vg_font_draw_string( font, 0.f, -76.f, &current->title );
+  vg_font_draw_string( font, 0.f, -line_height, &current->album );
+  vg_font_draw_string( font, 0.f, -2.f*line_height, &current->title );
 
   struct firestring_estr_t t_buf;
   firestring_estr_alloc( &t_buf, 32 );
@@ -339,8 +339,7 @@ int display_update ( const struct MPD_CURRENT* current )
 			   current->elapsed_time % 60,
 			   current->total_time / 60,
 			   current->total_time % 60 );
-  vg_font_string_eval( font, &t_buf );
-  vg_font_draw_string( font, 0.f, -114.f, &t_buf );
+  vg_font_draw_string( font, 0.f, -3.f*line_height, &t_buf );
   firestring_estr_free( &t_buf );
 #if 0
   if ( current->changed & MPD_CHANGED_ARTIST ) {
