@@ -17,9 +17,7 @@
 #include "display_intf.h"
 
 static int convert_int ( const char* string );
-#if 0
-static int idle ( int seconds );
-#endif
+
 static gboolean poll_mpd ( gpointer data );
 static gboolean reconnect_mpd ( gpointer data );
 
@@ -110,54 +108,7 @@ int main ( int argc, char* argv[] )
   // Well, after all that, we can now start polling MPD to see what's up.
 
   mpd_current_init( &main_data.current );
-#if 0
-  int status = 0;
 
-  while ( status == 0 ) {
-
-    if( idle( 1 ) < 0 ) {
-      printf( "Error: Failed to sleep: %s\n", strerror( errno ) );
-    }
-
-    status = mpd_get_current( mpd, &current );
-
-    if ( status == 0 ) {
-#if 0
-      if ( current.changed & MPD_CHANGED_ARTIST ) {
-	firestring_printf( "new artist: '%e'\n", &current.artist );
-      }
-      if ( current.changed & MPD_CHANGED_ALBUM ) {
-	firestring_printf( "new album: '%e'\n", &current.album );
-      }
-      if ( current.changed & MPD_CHANGED_TITLE ) {
-	firestring_printf( "new title: '%e'\n", &current.title );
-      }
-      if ( current.changed & MPD_CHANGED_ELAPSED ) {
-	firestring_printf( "new elapsed time: %d\n", current.elapsed_time );
-      }
-      if ( current.changed & MPD_CHANGED_TOTAL ) {
-	firestring_printf( "new total time: %d\n", current.total_time );
-      }
-      if ( current.changed & MPD_CHANGED_STATUS ) {
-	firestring_printf( "new status: %d\n", current.play_status );
-      }
-#endif
-    }
-    else {
-      return 1;
-    }
-
-    if ( current.changed & MPD_CHANGED_ANY ) {
-      if ( display_update( &current ) < 0 ) {
-	return 1;
-      }
-    }
-  }
-
-  mpd_close( mpd );
-
-  display_close();
-#else
   main_data.loop = g_main_loop_new( NULL, FALSE );
 
   (void)g_timeout_add_seconds( 1, poll_mpd, &main_data );
@@ -169,7 +120,6 @@ int main ( int argc, char* argv[] )
   mpd_close( main_data.mpd );
 
   display_close();
-#endif
 
   return 0;
 }
@@ -193,109 +143,23 @@ static int convert_int ( const char* string )
   }
   return value;
 }
-#if 0
-/*!
- * Sleep for the given number of seconds.
- * \param[0] seconds time to sleep in seconds.
- * \return 0 if we successfully waited, otherwise return -1. There is
- * a remote possibility that this could fail. Indicates a programming
- * error probably.
- */
-static int idle ( int seconds )
-{
-  // I guess this is a best effort. If it fails, we just keep
-  // trying.
-  struct timespec request = { .tv_sec = seconds, .tv_nsec = 0 };
-  struct timespec remainder;
-  for ( ;; ) {
-    errno = 0;
 
-    int ret = nanosleep( &request, &remainder );
-
-    if ( ret == 0 ) {
-      break;
-    }
-    else {
-      if ( errno == EINTR ) {
-	request = remainder;
-      }
-      else {
-	// What to do here? It means our call was not correct. Probably
-	// should exit the program since we're not using nanosleep
-	// correctly.
-	return -1;
-      }
-    }
-  }
-  return 0;
-}
-#endif
 gboolean reconnect_mpd ( gpointer data )
 {
-#if 0
-  static int count = 0;
-  if ( ++count < 5 ) {
-    printf( "Trying to reconnect to MPD %d\n", count );
-    return TRUE;
-  }
-  else {
-    printf( "Connected to MPD again!\n" );
-    (void)g_timeout_add_seconds( 1, poll_mpd, data );
-    count = 0;
-    return FALSE;
-  }
-#else
   // \bug this is not right, of couse, we have to figure out
   // if we can call mpd_connect again.
   printf( "Connected to MPD again!\n" );
   (void)g_timeout_add_seconds( 1, poll_mpd, data );
   return FALSE;
-#endif
 }
 
 gboolean poll_mpd ( gpointer data )
 {
-#if 0
-  static int count = 0;
-
-  if ( ++count < 10 ) {
-    printf( "Read from MPD %d.\n", count );
-    return TRUE;
-  }
-  else {
-    printf( "We lost our connection to MPD. Trying again shortly.\n" );
-    (void)g_timeout_add_seconds( 2, reconnect_mpd, data );
-    count = 0;
-    return FALSE;
-  }
-#else
   struct MAIN_DATA* main_data = data;
 
   int status = mpd_get_current( main_data->mpd, &main_data->current );
 
-  if ( status == 0 ) {
-#if 0
-    if ( current.changed & MPD_CHANGED_ARTIST ) {
-      firestring_printf( "new artist: '%e'\n", &current.artist );
-    }
-    if ( current.changed & MPD_CHANGED_ALBUM ) {
-      firestring_printf( "new album: '%e'\n", &current.album );
-    }
-    if ( current.changed & MPD_CHANGED_TITLE ) {
-      firestring_printf( "new title: '%e'\n", &current.title );
-    }
-    if ( current.changed & MPD_CHANGED_ELAPSED ) {
-      firestring_printf( "new elapsed time: %d\n", current.elapsed_time );
-    }
-    if ( current.changed & MPD_CHANGED_TOTAL ) {
-      firestring_printf( "new total time: %d\n", current.total_time );
-    }
-    if ( current.changed & MPD_CHANGED_STATUS ) {
-      firestring_printf( "new status: %d\n", current.play_status );
-    }
-#endif
-  }
-  else {
+  if ( status != 0 ) {
     printf( "We lost our connection to MPD. Trying again shortly.\n" );
     (void)g_timeout_add_seconds( 5, reconnect_mpd, data );
     return FALSE;
@@ -303,11 +167,10 @@ gboolean poll_mpd ( gpointer data )
 
   if ( main_data->current.changed & MPD_CHANGED_ANY ) {
     if ( display_update( &main_data->current ) < 0 ) {
-      // \bug well, what should I do here?
+      // \bug well, what should I do here? Muddle on for now.
       return TRUE;
     }
   }
 
   return TRUE;
-#endif
 }

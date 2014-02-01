@@ -5,7 +5,7 @@
 #ifndef MPD_INTF_H
 #define MPD_INTF_H
 
-#include "firestring.h"
+#include "glib.h"
 /*!
  * Simple status of MPD.
  */
@@ -38,11 +38,11 @@ struct MPD_CURRENT {
   //! Play status.
   enum MPD_PLAY_STATUS play_status;
   //! The artist (UTF-8)
-  struct firestring_estr_t artist;
+  GString* artist;
   //! The album (UTF-8)
-  struct firestring_estr_t album;
+  GString* album;
   //! The title (UTF-8)
-  struct firestring_estr_t title;
+  GString* title;
   //! Elapsed time in seconds.
   int elapsed_time;
   //! Total track time in seconds.

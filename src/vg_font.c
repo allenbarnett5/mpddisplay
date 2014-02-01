@@ -6,7 +6,6 @@
 #include <iconv.h>
 #include "ft2build.h"
 #include FT_FREETYPE_H
-#include "firestring.h"
 #include "VG/openvg.h"
 #include "VG/vgu.h"
 
@@ -99,60 +98,12 @@ float vg_font_line_height ( struct VG_FONT_HANDLE* handle )
   return float_from_26_6( handle->d->face->size->metrics.height );
 }
 
-#if 0
-int vg_font_string_eval ( struct VG_FONT_HANDLE* handle,
-			  const struct firestring_estr_t* string )
-{
-  // Step 1: Convert the UTF-8 string to UTF-32 because that's
-  // what the OpenVG glyph renderer expects.
-  char* in = string->s;
-  size_t n_in = string->l;
-  size_t utf32_size = sizeof(uint32_t) * n_in; // Guess this is enough.
-  size_t n_out = utf32_size;
-  uint32_t* utf32 = malloc( utf32_size );
-  char* out = (char*)utf32;
-  size_t n_conv;
-  n_conv = iconv( handle->d->utf8_utf32, &in, &n_in, &out, &n_out );
-  if ( n_conv == (size_t)-1 ) {
-    // Well, if errno == E2BIG, we could try again with a bigger
-    // buffer, otherwise this is a bit hopeless.
-  }
-  size_t n_char = ( utf32_size - n_out ) / 4;
-
-  // Step 2: Make sure that an OpenVG glyph exists for each character.
-  // The problem here is whether to keep track of separate font
-  // sizes. That is, should OpenVG do the font scaling or should
-  // FreeType?
-  size_t c;
-  for ( c = 0; c < n_char; c++ ) {
-    int block = utf32[c] >> 8;
-    int word  = utf32[c] & 0xff;
-    if ( block < N_BLOCKS ) {
-      int word_i = word / N_WORDS;
-      int bit_i  = 1 << ( word & 0x7 );
-      if ( handle->d->has_vg_glyph[block][word_i] & bit_i ) {
-      }
-      else {
-	handle->d->has_vg_glyph[block][word_i] |= bit_i;
-	add_char( handle->d->font, handle->d->face, utf32[c] );
-      }
-    }
-    else {
-      // Switch to undefined character?
-    }
-  }
-
-  // Should probably return this buffer for drawing later.
-  free( utf32 );
-  return 0;
-}
-#endif
 void vg_font_draw_string ( struct VG_FONT_HANDLE* handle,
 			   float x, float y,
-			   const struct firestring_estr_t* string )
+			   const GString* string )
 {
-  char* in = string->s;
-  size_t n_in = string->l;
+  char* in = string->str;
+  size_t n_in = string->len;
   size_t utf32_size = sizeof(uint32_t) * n_in; // Guess this is enough.
   size_t n_out = utf32_size;
   uint32_t* utf32 = malloc( utf32_size );

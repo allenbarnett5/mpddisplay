@@ -108,18 +108,18 @@ void mpd_current_init ( struct MPD_CURRENT* current )
 {
   current->changed = 0;
   current->play_status = MPD_PLAY_STATUS_NOSONG;
-  firestring_estr_alloc( &current->artist, 256 );
-  firestring_estr_alloc( &current->album, 256 );
-  firestring_estr_alloc( &current->title, 256 );
+  current->artist = g_string_sized_new( 256 );
+  current->album = g_string_sized_new( 256 );
+  current->title = g_string_sized_new( 256 );
   current->elapsed_time = 0;
   current->total_time = 0;
 }
 
 void mpd_current_free ( struct MPD_CURRENT* current )
 {
-  firestring_estr_free( &current->artist );
-  firestring_estr_free( &current->album );
-  firestring_estr_free( &current->title );
+  g_string_free( current->artist, TRUE );
+  g_string_free( current->album, TRUE );
+  g_string_free( current->title, TRUE );
 }
 
 int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
@@ -127,6 +127,7 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
   // So, this is the nub of it. Send a command to MPD and await its
   // response.
   // \bug could compress this down into a single call to put_line...
+  // \bug construct a string with all this to begin with...
   int n_written;
 
   n_written = put_line( mpd, "command_list_begin\n", 19 );
@@ -178,19 +179,31 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
       break;
     }
     // The rest of this is parsing the output.
-    else if ( n_read > 6 && strncmp( "Artist:", buffer, 7 ) == 0 ) {
+    else if ( n_read > 7 && strncmp( "Artist: ", buffer, 8 ) == 0 ) {
+#if 0
       firestring_estr_astrcpy( &current.artist, &buffer[7] );
       firestring_estr_ip_trim( &current.artist );
+#else
+      g_string_assign( current.artist, &buffer[8] );
+#endif
       continue;
     }
-    else if ( n_read > 5 && strncmp( "Album:", buffer, 6 ) == 0 ) {
+    else if ( n_read > 6 && strncmp( "Album: ", buffer, 7 ) == 0 ) {
+#if 0
       firestring_estr_astrcpy( &current.album, &buffer[6] );
       firestring_estr_ip_trim( &current.album );
+#else
+      g_string_assign( current.album, &buffer[7] );
+#endif
       continue;
     }
-    else if ( n_read > 5 && strncmp( "Title:", buffer, 6 ) == 0 ) {
+    else if ( n_read > 6 && strncmp( "Title: ", buffer, 7 ) == 0 ) {
+#if 0
       firestring_estr_astrcpy( &current.title, &buffer[6] );
       firestring_estr_ip_trim( &current.title );
+#else
+      g_string_assign( current.title, &buffer[7] );
+#endif
       continue;
     }
     else if ( n_read > 4 && strncmp( "time:", buffer, 5 ) == 0 ) {
@@ -227,6 +240,7 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
   }
 
   previous->changed = 0;
+#if 0
   if ( firestring_estr_estrcmp( &previous->artist, &current.artist, 0 ) != 0 ) {
     firestring_estr_aestrcpy( &previous->artist, &current.artist, 0 );
     previous->changed |= MPD_CHANGED_ARTIST;
@@ -239,6 +253,20 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
     firestring_estr_aestrcpy( &previous->title, &current.title, 0 );
     previous->changed |= MPD_CHANGED_TITLE;
   }
+#else
+  if ( ! g_string_equal( previous->artist, current.artist ) ) {
+    g_string_assign( previous->artist, current.artist->str );
+    previous->changed |= MPD_CHANGED_ARTIST;
+  }
+  if ( ! g_string_equal( previous->album, current.album ) ) {
+    g_string_assign( previous->album, current.album->str );
+    previous->changed |= MPD_CHANGED_ALBUM;
+  }
+  if ( ! g_string_equal( previous->title, current.title ) ) {
+    g_string_assign( previous->title, current.title->str );
+    previous->changed |= MPD_CHANGED_TITLE;
+  }
+#endif
   if ( previous->elapsed_time != current.elapsed_time ) {
     previous->elapsed_time = current.elapsed_time;
     previous->changed |= MPD_CHANGED_ELAPSED;
@@ -304,6 +332,9 @@ static ssize_t read_line( int fd, void* buffer, size_t n )
 	*c_buf++ = c;
       }
       if ( c == '\n' ) {
+	// I think we want to eat the new line.
+	c_buf--;
+	total_read--;
 	break;
       }
     }

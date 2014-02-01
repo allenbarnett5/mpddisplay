@@ -8,7 +8,7 @@ CFLAGS = -g -Wall -Wextra -MMD \
 
 mpddisplay: main.o mpd_intf.o display_intf.o vg_font.o
 	gcc -o mpddisplay main.o mpd_intf.o display_intf.o vg_font.o \
--L /opt/vc/lib -lGLESv2 -lfirestring -lfreetype -lglib-2.0
+-L /opt/vc/lib -lGLESv2 -lfreetype -lglib-2.0
 
 clean:
 	rm main.o mpd_intf.o display_intf.o vg_font.o mpddisplay

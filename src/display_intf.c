@@ -327,10 +327,10 @@ int display_update ( const struct MPD_CURRENT* current )
 
   vgDrawPath( frame_path, VG_FILL_PATH );
 
-  vg_font_draw_string( font, 0.f, 0.f, &current->artist );
-  vg_font_draw_string( font, 0.f, -line_height, &current->album );
-  vg_font_draw_string( font, 0.f, -2.f*line_height, &current->title );
-
+  vg_font_draw_string( font, 0.f, 0.f, current->artist );
+  vg_font_draw_string( font, 0.f, -line_height, current->album );
+  vg_font_draw_string( font, 0.f, -2.f*line_height, current->title );
+#if 0
   struct firestring_estr_t t_buf;
   firestring_estr_alloc( &t_buf, 32 );
 
@@ -341,6 +341,19 @@ int display_update ( const struct MPD_CURRENT* current )
 			   current->total_time % 60 );
   vg_font_draw_string( font, 0.f, -3.f*line_height, &t_buf );
   firestring_estr_free( &t_buf );
+#else
+  GString* t_buf = g_string_sized_new( 32 );
+
+  g_string_printf( t_buf,  "%02d:%02d / %02d:%02d",
+			   current->elapsed_time / 60,
+			   current->elapsed_time % 60,
+			   current->total_time / 60,
+			   current->total_time % 60 );
+
+  vg_font_draw_string( font, 0.f, -3.f*line_height, t_buf );
+
+  g_string_free( t_buf, TRUE );
+#endif
 #if 0
   if ( current->changed & MPD_CHANGED_ARTIST ) {
   }
