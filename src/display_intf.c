@@ -12,6 +12,7 @@
 
 #include "mpd_intf.h"
 #include "vg_font.h"
+#include "text_widget.h"
 #include "display_intf.h"
 
 static const char* egl_carp ( void );
@@ -60,6 +61,9 @@ static const VGfloat text_gutter = 1.f;
 
 // The basic height of the font in mm.
 static const VGfloat font_size_mm = 3.f;
+
+// Our text layout widget.
+static struct TEXT_WIDGET_HANDLE text_widget;
 
 int display_init ( const char* font_file )
 {
@@ -316,6 +320,12 @@ int display_init ( const char* font_file )
 	       - (line_height + text_gutter ) );
   vgScale( 1.f, 1.f );
 
+  // As an alternative to the above direct font business, we created
+  // a text widget. Draw in the box provided here. However, the display
+  // code will decide where on the screen the box goes.
+  text_widget = text_widget_init( tv_width, tv_height,
+				  vc_frame_width, vc_frame_height );
+
   return 0;
 }
 
@@ -330,18 +340,7 @@ int display_update ( const struct MPD_CURRENT* current )
   vg_font_draw_string( font, 0.f, 0.f, current->artist );
   vg_font_draw_string( font, 0.f, -line_height, current->album );
   vg_font_draw_string( font, 0.f, -2.f*line_height, current->title );
-#if 0
-  struct firestring_estr_t t_buf;
-  firestring_estr_alloc( &t_buf, 32 );
 
-  firestring_estr_sprintf( &t_buf, "%02d:%02d / %02d:%02d",
-			   current->elapsed_time / 60,
-			   current->elapsed_time % 60,
-			   current->total_time / 60,
-			   current->total_time % 60 );
-  vg_font_draw_string( font, 0.f, -3.f*line_height, &t_buf );
-  firestring_estr_free( &t_buf );
-#else
   GString* t_buf = g_string_sized_new( 32 );
 
   g_string_printf( t_buf,  "%02d:%02d / %02d:%02d",
@@ -353,7 +352,25 @@ int display_update ( const struct MPD_CURRENT* current )
   vg_font_draw_string( font, 0.f, -3.f*line_height, t_buf );
 
   g_string_free( t_buf, TRUE );
-#endif
+
+  // And again for the text widget. We only want one marked up string.
+  // Needless to say, a more sophisticated treatment would only
+  // redo the layout if something changes!
+  GString* w_buf = g_string_sized_new( 2048 );
+  g_string_printf( w_buf, "<big>%s</big>\n<i>%s</i>\n<b>%s</b>\n%02d:%02d / %02d:%02d",
+		   current->artist->str,
+		   current->album->str,
+		   current->title->str,
+		   current->elapsed_time / 60,
+		   current->elapsed_time % 60,
+		   current->total_time / 60,
+		   current->total_time % 60 );
+
+  text_widget_set_text( text_widget, w_buf );
+  text_widget_draw_text( text_widget );
+
+  g_string_free( w_buf, TRUE );
+
 #if 0
   if ( current->changed & MPD_CHANGED_ARTIST ) {
   }
