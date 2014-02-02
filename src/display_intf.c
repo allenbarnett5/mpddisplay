@@ -315,16 +315,13 @@ int display_init ( const char* font_file )
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
   vgLoadIdentity();
   vgTranslate( vc_frame_x + border_thickness * vc_frame_width / tv_width
-	       + text_gutter,
-	       window_height - border_thickness * vc_frame_height / tv_height
-	       - (line_height + text_gutter ) );
-  vgScale( 1.f, 1.f );
+	       + text_gutter, -border_thickness * vc_frame_height / tv_height );
 
   // As an alternative to the above direct font business, we created
   // a text widget. Draw in the box provided here. However, the display
   // code will decide where on the screen the box goes.
-  text_widget = text_widget_init( tv_width, tv_height,
-				  vc_frame_width, vc_frame_height );
+  text_widget = text_widget_init( tv_width/2.f, tv_height,
+				  vc_frame_width/2.f, vc_frame_height );
 
   return 0;
 }
@@ -337,34 +334,19 @@ int display_update ( const struct MPD_CURRENT* current )
 
   vgDrawPath( frame_path, VG_FILL_PATH );
 
-  vg_font_draw_string( font, 0.f, 0.f, current->artist );
-  vg_font_draw_string( font, 0.f, -line_height, current->album );
-  vg_font_draw_string( font, 0.f, -2.f*line_height, current->title );
-
-  GString* t_buf = g_string_sized_new( 32 );
-
-  g_string_printf( t_buf,  "%02d:%02d / %02d:%02d",
-			   current->elapsed_time / 60,
-			   current->elapsed_time % 60,
-			   current->total_time / 60,
-			   current->total_time % 60 );
-
-  vg_font_draw_string( font, 0.f, -3.f*line_height, t_buf );
-
-  g_string_free( t_buf, TRUE );
-
   // And again for the text widget. We only want one marked up string.
   // Needless to say, a more sophisticated treatment would only
   // redo the layout if something changes!
-  GString* w_buf = g_string_sized_new( 2048 );
-  g_string_printf( w_buf, "<big>%s</big>\n<i>%s</i>\n<b>%s</b>\n%02d:%02d / %02d:%02d",
-		   current->artist->str,
-		   current->album->str,
-		   current->title->str,
-		   current->elapsed_time / 60,
-		   current->elapsed_time % 60,
-		   current->total_time / 60,
-		   current->total_time % 60 );
+  char* buffer =
+    g_markup_printf_escaped( "<span font=\"Droid Sans 22px\">%s\n<i>%s</i>\n<b>%s</b>\n%02d:%02d / %02d:%02d</span>",
+			     current->artist->str,
+			     current->album->str,
+			     current->title->str,
+			     current->elapsed_time / 60,
+			     current->elapsed_time % 60,
+			     current->total_time / 60,
+			     current->total_time % 60 );
+  GString* w_buf = g_string_new( buffer ); // For counting the characters.
 
   text_widget_set_text( text_widget, w_buf );
   text_widget_draw_text( text_widget );

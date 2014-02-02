@@ -3,16 +3,9 @@
  * selection.
  */
 #include <stdlib.h>
+
 #include "pango/pangoft2.h"
-#if 0
-#include <stdint.h>
-#include <errno.h>
-#include <iconv.h>
-#include "ft2build.h"
-#include FT_FREETYPE_H
 #include "VG/openvg.h"
-#include "VG/vgu.h"
-#endif
 
 #include "text_widget.h"
 
@@ -20,6 +13,28 @@ static float float_from_26_6( FT_Pos x )
 {
    return (float)x / 64.0f;
 }
+
+struct VG_DATA {
+  VGFont font;
+  uint8_t cmap[144]; // Probably should have an expandable structure. But
+		     // we know we don't have any glyphs > 144*8 = 1152.
+		     // Your collection may vary.
+};
+
+struct VG_DATA* vg_data_new ( void )
+{
+  struct VG_DATA* vg_data = malloc( sizeof( struct VG_DATA ) );
+  vg_data->font = vgCreateFont( 256 );
+  memset( vg_data->cmap, 0, sizeof vg_data->cmap );
+  return vg_data;
+}
+
+void vg_data_free ( void* vg_data_ptr )
+{
+  vgDestroyFont( ((struct VG_DATA*)vg_data_ptr)->font );
+}
+
+static void add_char ( VGFont font, FT_Face face, FT_ULong c );
 
 struct TEXT_WIDGET_PRIVATE {
   PangoFontMap* font_map;
@@ -54,19 +69,16 @@ struct TEXT_WIDGET_HANDLE text_widget_init ( float width_mm,
 void text_widget_set_text ( struct TEXT_WIDGET_HANDLE handle,
 			    const GString* text )
 {
-  // This function is trivial now!
   if ( handle.d == NULL || handle.d->layout == NULL )
     return;
 
   pango_layout_set_markup( handle.d->layout, text->str, text->len );
-}
 
-void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
-{
-  // This function is not trivial, though.
-  if ( handle.d == NULL || handle.d->layout == NULL )
-    return;
-  printf( "<layout start>\n" );
+  // The idea here is to make sure that the VGFont contains
+  // all the glyphs at the proper size so that when we want
+  // to draw, we can can just call vgDrawGlyphs (well, maybe
+  // not since PangoGlyphInfo is not an array of glyph
+  // indexes; aww).
   PangoLayoutIter* li = pango_layout_get_iter( handle.d->layout );
   do {
     PangoLayoutRun* run = pango_layout_iter_get_run( li );
@@ -77,20 +89,68 @@ void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
     // abstraction. Have to read the documentation to discover
     // that this font is a PangoFcFont.
     FT_Face face = pango_fc_font_lock_face( (PangoFcFont*)font );
-    printf( "face is %p: ", face );
     if ( face != NULL ) {
-      printf( "height %ld[%f] (x %d,y %d)\n", face->size->metrics.height,
-	      float_from_26_6( face->size->metrics.height ),
-	      face->size->metrics.x_ppem, face->size->metrics.y_ppem );
-    }
-    else {
-      printf( "hmm:-(\n" );
+      struct VG_DATA* vg_data = face->size->generic.data;
+      if ( vg_data == NULL ) {
+	vg_data = vg_data_new();
+	face->size->generic.data = vg_data;
+	face->size->generic.finalizer = vg_data_free;
+      }
+      int g;
+      for ( g = 0; g < run->glyphs->num_glyphs; g++ ) {
+	int byte = run->glyphs->glyphs[g].glyph / 8;
+	int bit  = 1 << ( run->glyphs->glyphs[g].glyph & 0x7 );
+	if ( ! ( vg_data->cmap[byte] & bit  ) ) {
+	  vg_data->cmap[byte] |= bit;
+	  add_char( vg_data->font, face, run->glyphs->glyphs[g].glyph );
+	}
+      }
+      pango_fc_font_unlock_face( (PangoFcFont*)font );
     }
   } while ( pango_layout_iter_next_run( li ) );
 
   pango_layout_iter_free( li );
+}
 
-  printf( "<layout end>\n" );
+void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
+{
+  if ( handle.d == NULL || handle.d->layout == NULL )
+    return;
+
+  int height = PANGO_PIXELS( pango_layout_get_height( handle.d->layout ) );
+
+  PangoLayoutIter* li = pango_layout_get_iter( handle.d->layout );
+  do {
+    PangoLayoutRun* run = pango_layout_iter_get_run( li );
+    if ( run == NULL )
+      continue;
+
+    PangoRectangle logical_rect;
+    int baseline_pango = pango_layout_iter_get_baseline( li );
+    int baseline_pixel = PANGO_PIXELS( baseline_pango );
+    pango_layout_iter_get_run_extents( li, NULL, &logical_rect );
+    int x_pixel = PANGO_PIXELS( logical_rect.x );
+
+    PangoFont* pg_font = run->item->analysis.font;
+
+    FT_Face face = pango_fc_font_lock_face( (PangoFcFont*)pg_font );
+
+    if ( face != NULL ) {
+      struct VG_DATA* vg_data = face->size->generic.data;
+      if ( vg_data != NULL ) {
+	// Note: inverted Y coordinate
+	VGfloat point[2] = { x_pixel, height-baseline_pixel };
+	vgSetfv( VG_GLYPH_ORIGIN, 2, point );
+	VGFont vg_font = vg_data->font;
+	int g;
+	for ( g = 0; g < run->glyphs->num_glyphs; g++ ) {
+	  vgDrawGlyph( vg_font, run->glyphs->glyphs[g].glyph, VG_FILL_PATH,
+		       VG_TRUE );
+	}
+      }
+      pango_fc_font_unlock_face( (PangoFcFont*)pg_font );
+    }
+  } while ( pango_layout_iter_next_run( li ) );
 }
 
 void text_widget_free_handle ( struct TEXT_WIDGET_HANDLE handle )
@@ -104,146 +164,7 @@ void text_widget_free_handle ( struct TEXT_WIDGET_HANDLE handle )
   }
 }
 
-#if 0
-#include "vg_font.h"
-
-static VGfloat float_from_26_6( FT_Pos x )
-{
-   return (VGfloat)x / 64.0f;
-}
-
-// This is the number of UNICODE "blocks" we expect to have to
-// draw glyphs for. I've surveyed my audio files and there are
-// no glyphs above U+07ff. So, this plus 256 bits per "block"
-// should be enough without resorting to an ordered-set or
-// hash table.
-#define N_BLOCKS (8)
-#define N_WORDS (256/(8*sizeof(uint32_t)))
-
-const float PT_PER_MM = 72.f / 25.4f;
-
-struct VG_FONT_PRIVATE {
-  FT_Library library;
-  FT_Face face;
-  iconv_t utf8_utf32;
-  uint32_t has_vg_glyph[N_BLOCKS][N_WORDS];
-  VGFont font;
-};
-
-static void add_char ( VGFont font, FT_Face face, FT_ULong c );
-
-struct VG_FONT_HANDLE* vg_font_init ( const char* font_file,
-				      float size, float dpi_x, float dpi_y )
-{
-  struct VG_FONT_HANDLE* handle = malloc( sizeof( struct VG_FONT_HANDLE ) );
-
-  if ( handle == NULL ) {
-    printf( "Error: Out of memory for font handle\n" );
-    return NULL;
-  }
-
-  handle->d = malloc( sizeof( struct VG_FONT_PRIVATE ) );
-
-  if ( handle->d == NULL ) {
-    printf( "Error: Out of memory for font handle private object\n" );
-    free( handle );
-    return NULL;
-  }
-
-  memset( handle->d->has_vg_glyph, 0, sizeof handle->d->has_vg_glyph );
-
-  FT_Error error;
-
-  error = FT_Init_FreeType( &handle->d->library );
-
-  if ( error != 0 ) {
-    printf( "Error: Could not initialize the FreeType library: %d\n", error );
-    vg_font_free_handle( handle );
-    return NULL;
-  }
-
-  error = FT_New_Face( handle->d->library, font_file, 0, &handle->d->face );
-
-  if ( error != 0 ) {
-    printf( "Error: Could not load the face from file: %s, error %d\n",
-	    font_file, error );
-    vg_font_free_handle( handle );
-    return NULL;
-  }
-
-  FT_Set_Char_Size( handle->d->face, 0, (size * PT_PER_MM) * 64,
-		    (FT_UInt)dpi_x, (FT_UInt)dpi_y );
-
-  handle->d->utf8_utf32 = iconv_open( "UTF-32LE", "UTF-8" );
-
-  if ( handle->d->utf8_utf32 == (iconv_t)-1) {
-    printf( "Error: Could not create UTF-8 to UTF-32 converter: %s\n",
-	    strerror( errno ) );
-    // \bug close the freetype stuff, too.
-    vg_font_free_handle( handle );
-    return NULL;
-  }
-
-  handle->d->font = vgCreateFont( 128 );
-
-  return handle;
-}
-
-float vg_font_line_height ( struct VG_FONT_HANDLE* handle )
-{
-  return float_from_26_6( handle->d->face->size->metrics.height );
-}
-
-void vg_font_draw_string ( struct VG_FONT_HANDLE* handle,
-			   float x, float y,
-			   const GString* string )
-{
-  char* in = string->str;
-  size_t n_in = string->len;
-  size_t utf32_size = sizeof(uint32_t) * n_in; // Guess this is enough.
-  size_t n_out = utf32_size;
-  uint32_t* utf32 = malloc( utf32_size );
-  char* out = (char*)utf32;
-  size_t n_conv;
-  n_conv = iconv( handle->d->utf8_utf32, &in, &n_in, &out, &n_out );
-  if ( n_conv == (size_t)-1 ) {
-    // Well, if errno == E2BIG, we could try again with a bigger
-    // buffer, otherwise this is a bit hopeless.
-  }
-
-  size_t n_char = ( utf32_size - n_out ) / 4;
-  size_t c;
-  for ( c = 0; c < n_char; c++ ) {
-    int block = utf32[c] >> 8;
-    int word  = utf32[c] & 0xff;
-    if ( block < N_BLOCKS ) {
-      int word_i = word / N_WORDS;
-      int bit_i  = 1 << ( word & 0x7 );
-      if ( handle->d->has_vg_glyph[block][word_i] & bit_i ) {
-      }
-      else {
-	handle->d->has_vg_glyph[block][word_i] |= bit_i;
-	add_char( handle->d->font, handle->d->face, utf32[c] );
-      }
-    }
-    else {
-      // Switch to undefined character?
-    }
-  }
-
-  VGfloat point[2] = { x, y };
-  vgSetfv( VG_GLYPH_ORIGIN, 2, point );
-  vgDrawGlyphs( handle->d->font, n_char, utf32, 0, 0, VG_FILL_PATH, VG_TRUE );
-
-  free( utf32 );
-}
-
-void vg_font_free_handle ( struct VG_FONT_HANDLE* handle )
-{
-  vgDestroyFont( handle->d->font );
-  free( handle->d );
-  free( handle );
-}
+// \bug this really needs help, too.
 
 #define SEGMENTS_COUNT_MAX 256
 #define COORDS_COUNT_MAX 1024
@@ -372,16 +293,17 @@ static void convert_outline ( const FT_Vector *points,
 
 static void add_char ( VGFont font, FT_Face face, FT_ULong c )
 {
-  FT_UInt cindex = FT_Get_Char_Index( face, c );
+  // Pango already provides us with the font index, not the glyph UNICODE
+  // point.
 
-  FT_Load_Glyph( face, cindex, FT_LOAD_DEFAULT );
+  FT_Load_Glyph( face, c, FT_LOAD_DEFAULT );
 
   FT_Outline *outline = &face->glyph->outline;
 
   VGPath path;
   path = vgCreatePath( VG_PATH_FORMAT_STANDARD, VG_PATH_DATATYPE_F,
 		       1.f, 0.f, 0, 0, VG_PATH_CAPABILITY_ALL );
-  // It could be a blank. If any character doesn't have a glyph,
+  // It could be a blank. If any character doesn't have a glyph, though,
   // nothing is drawn by vgDrawGlyphs.
   if ( outline->n_contours > 0 ) {
     convert_outline( outline->points, outline->tags, outline->contours,
@@ -397,4 +319,4 @@ static void add_char ( VGFont font, FT_Face face, FT_ULong c )
 
   vgDestroyPath( path );
 }
-#endif
+
