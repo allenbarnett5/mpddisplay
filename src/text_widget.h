@@ -13,6 +13,12 @@ struct TEXT_WIDGET_HANDLE {
   struct TEXT_WIDGET_PRIVATE* d;
 };
 
+enum TEXT_WIDGET_ALIGNMENT {
+  TEXT_WIDGET_ALIGN_LEFT,
+  TEXT_WIDGET_ALIGN_CENTER,
+  TEXT_WIDGET_ALIGN_RIGHT
+};
+
 /*!
  * Create a text widget.  What attributes are important? Really the
  * width and height in mm and and pixels. Do we want to have a default
@@ -28,6 +34,14 @@ struct TEXT_WIDGET_HANDLE text_widget_init ( float width_mm,
 					     float height_mm,
 					     int width_pixels,
 					     int height_pixels );
+
+/*!
+ * Set the text alignment.
+ * \param[inout] handle the text widget to update.
+ * \param[in] alignment the new text alignment.
+ */
+void text_widget_set_alignment ( struct TEXT_WIDGET_HANDLE handle,
+				 enum TEXT_WIDGET_ALIGNMENT alignment );
 
 /*!
  * Layout this text. Could have Pango markup to make it attractive.

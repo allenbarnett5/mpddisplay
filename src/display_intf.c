@@ -11,7 +11,6 @@
 #include "VG/vgu.h"
 
 #include "mpd_intf.h"
-#include "vg_font.h"
 #include "text_widget.h"
 #include "display_intf.h"
 
@@ -27,10 +26,6 @@ static EGL_DISPMANX_WINDOW_T native_window;
 static int window_width = 0;
 static int window_height = 0;
 static VGPath frame_path;
-static struct VG_FONT_HANDLE* font;
-static VGfloat line_height = 0;
-
-const VGfloat INCH_PER_MM = 1.f / 25.4f;
 
 // Rather than burying these in the code, here are some constants
 // which we can play with to make the screen look better.
@@ -50,7 +45,7 @@ static const VGfloat vc_frame_height = 461.f;
 // Background color and alpha
 static const VGfloat background[] = { 0.f, 0.f, 0.f, 1.f };
 // Frame color (although this will eventually be a texture).
-static VGfloat frame_color[] = { 0., 1.f, 0.f, 1. };
+static VGfloat frame_color[] = { 0.f, 0.7f, 0.7f, 1.f };
 
 // The size of border decoration in mm.
 static const VGfloat border_thickness = 2.f;
@@ -62,10 +57,12 @@ static const VGfloat text_gutter = 1.f;
 // The basic height of the font in mm.
 static const VGfloat font_size_mm = 3.f;
 
-// Our text layout widget.
-static struct TEXT_WIDGET_HANDLE text_widget;
+// Our metadata widget.
+static struct TEXT_WIDGET_HANDLE metadata_widget;
+// Our time widget.
+static struct TEXT_WIDGET_HANDLE time_widget;
 
-int display_init ( const char* font_file )
+int display_init ( void )
 {
   // There is a lot which can go wrong here. But evidently this can't
   // fail!
@@ -300,28 +297,19 @@ int display_init ( const char* font_file )
     return -1;
   }
 
-  // And get a font.
-
-  font = vg_font_init( font_file, font_size_mm,
-		       vc_frame_width / ( tv_width * INCH_PER_MM ),
-		       vc_frame_height / ( tv_height * INCH_PER_MM ) );
-
-  if ( font == NULL ) {
-    return -1;
-  }
-
-  line_height = vg_font_line_height( font ) ;
-
-  vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
-  vgLoadIdentity();
-  vgTranslate( vc_frame_x + border_thickness * vc_frame_width / tv_width
-	       + text_gutter, -border_thickness * vc_frame_height / tv_height );
-
-  // As an alternative to the above direct font business, we created
-  // a text widget. Draw in the box provided here. However, the display
-  // code will decide where on the screen the box goes.
-  text_widget = text_widget_init( tv_width/2.f, tv_height,
+  // \bug need to think more deeply about what the right description
+  // of the text box should be passed to the widget. The font cares
+  // about the screen DPI, but (I think) the layout is done on the
+  // basis of pixels.
+  metadata_widget = text_widget_init( tv_width/2.f, tv_height,
 				  vc_frame_width/2.f, vc_frame_height );
+
+  // Not sure what the parameters of this should be. A height of 35.f
+  // looks ok for now, but really depends on the font.
+  time_widget = text_widget_init( tv_width/2.f, tv_height,
+				  vc_frame_width/2.f - 2.f*border_thickness * vc_frame_height / tv_height, 30.f );
+
+  text_widget_set_alignment( time_widget, TEXT_WIDGET_ALIGN_RIGHT );
 
   return 0;
 }
@@ -334,39 +322,52 @@ int display_update ( const struct MPD_CURRENT* current )
 
   vgDrawPath( frame_path, VG_FILL_PATH );
 
-  // And again for the text widget. We only want one marked up string.
-  // Needless to say, a more sophisticated treatment would only
-  // redo the layout if something changes!
-  char* buffer =
-    g_markup_printf_escaped( "<span font=\"Droid Sans 22px\">%s\n<i>%s</i>\n<b>%s</b>\n%02d:%02d / %02d:%02d</span>",
-			     current->artist->str,
-			     current->album->str,
-			     current->title->str,
-			     current->elapsed_time / 60,
-			     current->elapsed_time % 60,
-			     current->total_time / 60,
-			     current->total_time % 60 );
-  GString* w_buf = g_string_new( buffer ); // For counting the characters.
+  if ( current->changed &
+       ( MPD_CHANGED_ARTIST | MPD_CHANGED_ALBUM | MPD_CHANGED_TITLE ) ) {
+    char* buffer =
+      g_markup_printf_escaped( "<span font=\"Droid Sans 22px\">%s\n<i>%s</i>\n<b>%s</b></span>",
+			       current->artist->str,
+			       current->album->str,
+			       current->title->str );
 
-  text_widget_set_text( text_widget, w_buf );
-  text_widget_draw_text( text_widget );
+    GString* w_buf = g_string_new( buffer ); // For counting the characters.
 
-  g_string_free( w_buf, TRUE );
+    text_widget_set_text( metadata_widget, w_buf );
 
-#if 0
-  if ( current->changed & MPD_CHANGED_ARTIST ) {
+    g_string_free( w_buf, TRUE );
   }
-  if ( current->changed & MPD_CHANGED_ALBUM ) {
+
+  if ( current->changed & ( MPD_CHANGED_ELAPSED | MPD_CHANGED_TOTAL ) ) {
+    char* buffer =
+      g_markup_printf_escaped( "<span font=\"Droid Sans 22px\">%02d:%02d / %02d:%02d</span>",
+			       current->elapsed_time / 60,
+			       current->elapsed_time % 60,
+			       current->total_time / 60,
+			       current->total_time % 60 );
+    GString* w_buf = g_string_new( buffer ); // For counting the characters.
+
+    text_widget_set_text( time_widget, w_buf );
+
+    g_string_free( w_buf, TRUE );
   }
-  if ( current->changed & MPD_CHANGED_TITLE ) {
-  }
-  if ( current->changed & MPD_CHANGED_ELAPSED ) {
-  }
-  if ( current->changed & MPD_CHANGED_TOTAL ) {
-  }
-  if ( current->changed & MPD_CHANGED_STATUS ) {
-  }
-#endif
+
+  // So maybe this information should be in the widget?
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
+
+  vgLoadIdentity();
+  vgTranslate( vc_frame_x + border_thickness * vc_frame_width / tv_width
+	       + text_gutter,
+	       -border_thickness * vc_frame_height / tv_height );
+
+  text_widget_draw_text( metadata_widget );
+
+  vgLoadIdentity();
+  vgTranslate( vc_frame_x + border_thickness * vc_frame_width / tv_width
+	       + text_gutter + vc_frame_width/2.,
+	       vc_frame_y + border_thickness * vc_frame_height / tv_height );
+
+  text_widget_draw_text( time_widget );
+
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
 
   if ( swapped == EGL_FALSE ) {
@@ -380,8 +381,6 @@ int display_update ( const struct MPD_CURRENT* current )
 int display_close ( void )
 {
   eglTerminate( egl_display );
-
-  vg_font_free_handle( font );
 
   return 0;
 }

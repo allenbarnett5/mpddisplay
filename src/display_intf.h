@@ -8,10 +8,9 @@ struct MPD_CURRENT;
 
 /*!
  * Initialize the display.
- * \param font_file pick a font to use.
  * \return 0 if everything went ok, -1 otherwise.
  */
-int display_init ( const char* font_file );
+int display_init ( void );
 /*!
  * Update the display using the MPD information.
  * \param current the most recent data returned from MPD.

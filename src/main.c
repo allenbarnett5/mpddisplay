@@ -23,9 +23,6 @@ static gboolean reconnect_mpd ( gpointer data );
 
 const char* USAGE = "usage: %s [--host hostname] [--port port#]\n";
 
-// \bug Probably should let the user choose.
-const char* MPD_DISPLAY_FONT = "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf";
-
 struct MAIN_DATA {
   int mpd;
   struct MPD_CURRENT current;
@@ -99,7 +96,7 @@ int main ( int argc, char* argv[] )
 
   // If we get this far, we can try to initialize the graphics.
 
-  int ret = display_init( MPD_DISPLAY_FONT );
+  int ret = display_init();
 
   if ( ret == -1 ) {
     return 1;

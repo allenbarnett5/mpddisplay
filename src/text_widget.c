@@ -66,6 +66,21 @@ struct TEXT_WIDGET_HANDLE text_widget_init ( float width_mm,
   return handle;
 }
 
+void text_widget_set_alignment ( struct TEXT_WIDGET_HANDLE handle,
+				 enum TEXT_WIDGET_ALIGNMENT alignment )
+{
+  if ( handle.d == NULL || handle.d->layout == NULL )
+    return;
+  switch ( alignment ) {
+  case TEXT_WIDGET_ALIGN_LEFT:
+    pango_layout_set_alignment( handle.d->layout, PANGO_ALIGN_LEFT ); break;
+  case TEXT_WIDGET_ALIGN_CENTER:
+    pango_layout_set_alignment( handle.d->layout, PANGO_ALIGN_CENTER ); break;
+  case TEXT_WIDGET_ALIGN_RIGHT:
+    pango_layout_set_alignment( handle.d->layout, PANGO_ALIGN_RIGHT ); break;
+  }
+}
+
 void text_widget_set_text ( struct TEXT_WIDGET_HANDLE handle,
 			    const GString* text )
 {
