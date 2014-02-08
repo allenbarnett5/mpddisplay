@@ -30,7 +30,8 @@ enum TEXT_WIDGET_ALIGNMENT {
  * \param[in] width_pixels
  * \param[in] height_pixels
  */
-struct TEXT_WIDGET_HANDLE text_widget_init ( float width_mm,
+struct TEXT_WIDGET_HANDLE text_widget_init ( int x, int y,
+					     float width_mm,
 					     float height_mm,
 					     int width_pixels,
 					     int height_pixels );

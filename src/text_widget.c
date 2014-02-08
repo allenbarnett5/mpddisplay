@@ -37,18 +37,23 @@ void vg_data_free ( void* vg_data_ptr )
 static void add_char ( VGFont font, FT_Face face, FT_ULong c );
 
 struct TEXT_WIDGET_PRIVATE {
+  int x;
+  int y;
   PangoFontMap* font_map;
   PangoContext* context;
   PangoLayout* layout;
 };
 
-struct TEXT_WIDGET_HANDLE text_widget_init ( float width_mm,
+struct TEXT_WIDGET_HANDLE text_widget_init ( int x, int y,
+					     float width_mm,
 					     float height_mm,
 					     int width_pixels,
 					     int height_pixels )
 {
   struct TEXT_WIDGET_HANDLE handle;
   handle.d = malloc( sizeof( struct TEXT_WIDGET_PRIVATE ) );
+  handle.d->x = x;
+  handle.d->y = y;
   handle.d->font_map = pango_ft2_font_map_new();
 
   pango_ft2_font_map_set_resolution( (PangoFT2FontMap*)handle.d->font_map,
@@ -131,6 +136,11 @@ void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
 {
   if ( handle.d == NULL || handle.d->layout == NULL )
     return;
+
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
+
+  vgLoadIdentity();
+  vgTranslate( handle.d->x, handle.d->y );
 
   int height = PANGO_PIXELS( pango_layout_get_height( handle.d->layout ) );
 

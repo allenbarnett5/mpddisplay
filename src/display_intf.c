@@ -12,6 +12,8 @@
 
 #include "mpd_intf.h"
 #include "text_widget.h"
+#include "image_widget.h"
+#include "cover_image.h"
 #include "display_intf.h"
 
 static const char* egl_carp ( void );
@@ -61,6 +63,8 @@ static const VGfloat font_size_mm = 3.f;
 static struct TEXT_WIDGET_HANDLE metadata_widget;
 // Our time widget.
 static struct TEXT_WIDGET_HANDLE time_widget;
+// The album cover widget.
+static struct IMAGE_WIDGET_HANDLE cover_widget;
 
 int display_init ( void )
 {
@@ -301,15 +305,27 @@ int display_init ( void )
   // of the text box should be passed to the widget. The font cares
   // about the screen DPI, but (I think) the layout is done on the
   // basis of pixels.
-  metadata_widget = text_widget_init( tv_width/2.f, tv_height,
-				  vc_frame_width/2.f, vc_frame_height );
+  metadata_widget = text_widget_init( vc_frame_x + border_thickness * vc_frame_width / tv_width
+				      + text_gutter,
+				      -border_thickness * vc_frame_height / tv_height,
+				      tv_width/2.f, tv_height,
+				      vc_frame_width/2.f, vc_frame_height );
 
   // Not sure what the parameters of this should be. A height of 35.f
   // looks ok for now, but really depends on the font.
-  time_widget = text_widget_init( tv_width/2.f, tv_height,
+  time_widget = text_widget_init( vc_frame_x + border_thickness * vc_frame_width / tv_width
+				  + text_gutter + vc_frame_width/2.,
+				  vc_frame_y + border_thickness * vc_frame_height / tv_height,
+				  tv_width/2.f, tv_height,
 				  vc_frame_width/2.f - 2.f*border_thickness * vc_frame_height / tv_height, 30.f );
 
   text_widget_set_alignment( time_widget, TEXT_WIDGET_ALIGN_RIGHT );
+
+  // The cover widget. Where is it going to go?
+  cover_widget = image_widget_init( vc_frame_width/2.f,
+				    vc_frame_height-border_thickness * vc_frame_height / tv_height,
+				    tv_width/2.f, tv_height,
+				    vc_frame_width/2.f, vc_frame_width/2.f );
 
   return 0;
 }
@@ -351,22 +367,17 @@ int display_update ( const struct MPD_CURRENT* current )
     g_string_free( w_buf, TRUE );
   }
 
-  // So maybe this information should be in the widget?
-  vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
-
-  vgLoadIdentity();
-  vgTranslate( vc_frame_x + border_thickness * vc_frame_width / tv_width
-	       + text_gutter,
-	       -border_thickness * vc_frame_height / tv_height );
-
   text_widget_draw_text( metadata_widget );
 
-  vgLoadIdentity();
-  vgTranslate( vc_frame_x + border_thickness * vc_frame_width / tv_width
-	       + text_gutter + vc_frame_width/2.,
-	       vc_frame_y + border_thickness * vc_frame_height / tv_height );
-
   text_widget_draw_text( time_widget );
+
+  if ( current->changed & MPD_CHANGED_ALBUM ) {
+    struct IMAGE_HANDLE cover_image_handle =
+      cover_image( current->artist->str, current->album->str );
+    image_widget_set_image( cover_widget, cover_image_handle );
+  }
+
+  image_widget_draw_image( cover_widget );
 
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
 
