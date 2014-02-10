@@ -44,10 +44,14 @@ static const VGfloat tv_height = 53.975f;
 static const VGfloat vc_frame_width = 698.f;
 // Approximate # of visible NTSC DISPMANX lines on *my* TV
 static const VGfloat vc_frame_height = 461.f;
+// Resolution in X d/mm. (converts a distance to pixels)
+static const VGfloat dpmm_x = 698./95.25; // vc_frame_width / tv_width;
+// Resolution in Y d/mm. (converts a distance to pixels)
+static const VGfloat dpmm_y = 461./53.975; // vc_frame_height / tv_height;
 // Background color and alpha
 static const VGfloat background[] = { 0.f, 0.f, 0.f, 1.f };
 // Frame color (although this will eventually be a texture).
-static VGfloat frame_color[] = { 0.f, 0.7f, 0.7f, 1.f };
+static VGfloat frame_color[] = { 0.f, 1.f, 1.f, 1.f };
 
 // The size of border decoration in mm.
 static const VGfloat border_thickness = 2.f;
@@ -278,7 +282,7 @@ int display_init ( void )
   vgLoadIdentity();
   vgTranslate( vc_frame_x, vc_frame_y );
   // We should be able to draw in mm and squares should be square.
-  vgScale( vc_frame_width / tv_width, vc_frame_height / tv_height );
+  vgScale( dpmm_x, dpmm_y );
 
   // Define the main frame.
   frame_path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
@@ -288,10 +292,22 @@ int display_init ( void )
 			     VG_PATH_CAPABILITY_ALL );
 
   vguRect( frame_path, 0.f, 0.f, tv_width, tv_height );
+#if 0
   vguRect( frame_path, border_thickness, border_thickness,
 	   tv_width - 2.f * border_thickness,
 	   tv_height - 2.f * border_thickness );
-
+#else
+  // Text box.
+  vguRect( frame_path, border_thickness, border_thickness,
+	   tv_width / 2.f - border_thickness / 2.f,
+	   tv_height - 2.f * border_thickness );
+  // Time box.
+  vguRect( frame_path,
+	   tv_width / 2.f + border_thickness,
+	   border_thickness,
+	   tv_width / 2.f - 2.f * border_thickness,
+	   2.f * border_thickness );
+#endif
   vgDrawPath( frame_path, VG_FILL_PATH );
 
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
@@ -305,27 +321,34 @@ int display_init ( void )
   // of the text box should be passed to the widget. The font cares
   // about the screen DPI, but (I think) the layout is done on the
   // basis of pixels.
-  metadata_widget = text_widget_init( vc_frame_x + border_thickness * vc_frame_width / tv_width
+  metadata_widget = text_widget_init( vc_frame_x + border_thickness * dpmm_x
 				      + text_gutter,
-				      -border_thickness * vc_frame_height / tv_height,
+				      -border_thickness * dpmm_y,
 				      tv_width/2.f, tv_height,
 				      vc_frame_width/2.f, vc_frame_height );
 
   // Not sure what the parameters of this should be. A height of 35.f
   // looks ok for now, but really depends on the font.
-  time_widget = text_widget_init( vc_frame_x + border_thickness * vc_frame_width / tv_width
+  time_widget = text_widget_init( vc_frame_x + border_thickness * dpmm_x
 				  + text_gutter + vc_frame_width/2.,
-				  vc_frame_y + border_thickness * vc_frame_height / tv_height,
+				  vc_frame_y + border_thickness * dpmm_y,
 				  tv_width/2.f, tv_height,
-				  vc_frame_width/2.f - 2.f*border_thickness * vc_frame_height / tv_height, 30.f );
+				  vc_frame_width/2.f - 2.f*border_thickness * dpmm_y, 30.f );
 
-  text_widget_set_alignment( time_widget, TEXT_WIDGET_ALIGN_RIGHT );
+  text_widget_set_alignment( time_widget, TEXT_WIDGET_ALIGN_CENTER );
 
-  // The cover widget. Where is it going to go?
-  cover_widget = image_widget_init( vc_frame_width/2.f,
-				    vc_frame_height-border_thickness * vc_frame_height / tv_height,
-				    tv_width/2.f, tv_height,
-				    vc_frame_width/2.f, vc_frame_width/2.f );
+  // The cover widget. Where is it going to go? Need to specify
+  // the width and height carefully so that the aspect ratio is
+  // correct.
+  float iw_x_pix = vc_frame_width/2.f + 2.f * border_thickness * dpmm_x;
+  float iw_y_pix = vc_frame_height-border_thickness * dpmm_y;
+  float iw_width_mm = tv_width / 2.f - 2.f * border_thickness;
+  float iw_height_mm = iw_width_mm;
+  float iw_width_pix = iw_width_mm * dpmm_x;
+  float iw_height_pix = iw_height_mm * dpmm_y;
+  cover_widget = image_widget_init( iw_x_pix, iw_y_pix,
+				    iw_width_mm, iw_height_mm,
+				    iw_width_pix, iw_height_pix );
 
   return 0;
 }
@@ -341,7 +364,7 @@ int display_update ( const struct MPD_CURRENT* current )
   if ( current->changed &
        ( MPD_CHANGED_ARTIST | MPD_CHANGED_ALBUM | MPD_CHANGED_TITLE ) ) {
     char* buffer =
-      g_markup_printf_escaped( "<span font=\"Droid Sans 22px\">%s\n<i>%s</i>\n<b>%s</b></span>",
+      g_markup_printf_escaped( "<span font=\"Droid Sans 26px\">%s\n<i>%s</i>\n<b>%s</b></span>",
 			       current->artist->str,
 			       current->album->str,
 			       current->title->str );
@@ -355,7 +378,7 @@ int display_update ( const struct MPD_CURRENT* current )
 
   if ( current->changed & ( MPD_CHANGED_ELAPSED | MPD_CHANGED_TOTAL ) ) {
     char* buffer =
-      g_markup_printf_escaped( "<span font=\"Droid Sans 22px\">%02d:%02d / %02d:%02d</span>",
+      g_markup_printf_escaped( "<span font=\"Droid Sans 26px\">%02d:%02d / %02d:%02d</span>",
 			       current->elapsed_time / 60,
 			       current->elapsed_time % 60,
 			       current->total_time / 60,
