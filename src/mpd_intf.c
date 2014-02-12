@@ -180,30 +180,27 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
     }
     // The rest of this is parsing the output.
     else if ( n_read > 7 && strncmp( "Artist: ", buffer, 8 ) == 0 ) {
-#if 0
-      firestring_estr_astrcpy( &current.artist, &buffer[7] );
-      firestring_estr_ip_trim( &current.artist );
-#else
       g_string_assign( current.artist, &buffer[8] );
-#endif
       continue;
     }
     else if ( n_read > 6 && strncmp( "Album: ", buffer, 7 ) == 0 ) {
-#if 0
-      firestring_estr_astrcpy( &current.album, &buffer[6] );
-      firestring_estr_ip_trim( &current.album );
-#else
-      g_string_assign( current.album, &buffer[7] );
-#endif
+      if ( current.album->len > 0 ) {
+	g_string_append( current.album, " - " );
+	g_string_append( current.album, &buffer[7] );
+      }
+      else {
+	g_string_assign( current.album, &buffer[7] );
+      }
       continue;
     }
     else if ( n_read > 6 && strncmp( "Title: ", buffer, 7 ) == 0 ) {
-#if 0
-      firestring_estr_astrcpy( &current.title, &buffer[6] );
-      firestring_estr_ip_trim( &current.title );
-#else
-      g_string_assign( current.title, &buffer[7] );
-#endif
+      if ( current.title->len > 0 ) {
+	g_string_append( current.title, " - " );
+	g_string_append( current.title, &buffer[7] );
+      }
+      else {
+	g_string_assign( current.title, &buffer[7] );
+      }
       continue;
     }
     else if ( n_read > 4 && strncmp( "time:", buffer, 5 ) == 0 ) {
@@ -240,20 +237,6 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
   }
 
   previous->changed = 0;
-#if 0
-  if ( firestring_estr_estrcmp( &previous->artist, &current.artist, 0 ) != 0 ) {
-    firestring_estr_aestrcpy( &previous->artist, &current.artist, 0 );
-    previous->changed |= MPD_CHANGED_ARTIST;
-  }
-  if ( firestring_estr_estrcmp( &previous->album, &current.album, 0 ) != 0 ) {
-    firestring_estr_aestrcpy( &previous->album, &current.album, 0 );
-    previous->changed |= MPD_CHANGED_ALBUM;
-  }
-  if ( firestring_estr_estrcmp( &previous->title, &current.title, 0 ) != 0 ) {
-    firestring_estr_aestrcpy( &previous->title, &current.title, 0 );
-    previous->changed |= MPD_CHANGED_TITLE;
-  }
-#else
   if ( ! g_string_equal( previous->artist, current.artist ) ) {
     g_string_assign( previous->artist, current.artist->str );
     previous->changed |= MPD_CHANGED_ARTIST;
@@ -266,7 +249,6 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
     g_string_assign( previous->title, current.title->str );
     previous->changed |= MPD_CHANGED_TITLE;
   }
-#endif
   if ( previous->elapsed_time != current.elapsed_time ) {
     previous->elapsed_time = current.elapsed_time;
     previous->changed |= MPD_CHANGED_ELAPSED;
