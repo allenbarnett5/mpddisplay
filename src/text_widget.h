@@ -45,6 +45,14 @@ void text_widget_set_alignment ( struct TEXT_WIDGET_HANDLE handle,
 				 enum TEXT_WIDGET_ALIGNMENT alignment );
 
 /*!
+ * Set the default foreground color.
+ * \param[inout] handle the text widget to update.
+ * \param[in] color a four float, RGBA, color specification.
+ */
+void text_widget_set_foreground( struct TEXT_WIDGET_HANDLE handle,
+				 float color[4] );
+
+/*!
  * Layout this text. Could have Pango markup to make it attractive.
  * \param[inout] handle the text widget.
  * \param[in] text the new string to display.

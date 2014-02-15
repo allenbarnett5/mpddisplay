@@ -27,7 +27,10 @@ static EGLSurface egl_surface = EGL_NO_SURFACE;
 static EGL_DISPMANX_WINDOW_T native_window;
 static int window_width = 0;
 static int window_height = 0;
+// The basic decoration.
 static VGPath frame_path;
+// The basic decoration color.
+static VGPaint frame_paint;
 
 // Rather than burying these in the code, here are some constants
 // which we can play with to make the screen look better.
@@ -273,10 +276,8 @@ int display_init ( void )
     return -1;
   }
 
-  VGPaint frame_paint = vgCreatePaint();
+  frame_paint = vgCreatePaint();
   vgSetParameterfv( frame_paint, VG_PAINT_COLOR, 4, frame_color );
-  vgSetPaint( frame_paint, VG_FILL_PATH );
-  vgDestroyPaint( frame_paint );
 
   // Prepare to draw.
   vgLoadIdentity();
@@ -327,6 +328,10 @@ int display_init ( void )
 				      tv_width/2.f, tv_height,
 				      vc_frame_width/2.f, vc_frame_height );
 
+  float CYAN[] = { 0.f, 1.f, 1.f, 1.f };
+
+  text_widget_set_foreground( metadata_widget, CYAN );
+
   // Not sure what the parameters of this should be. A height of 35.f
   // looks ok for now, but really depends on the font.
   time_widget = text_widget_init( vc_frame_x + border_thickness * dpmm_x
@@ -358,6 +363,8 @@ int display_update ( const struct MPD_CURRENT* current )
   // For now, this is very simple. Redraw the whole screen.
 
   vgClear( 0, 0, window_width, window_height );
+
+  vgSetPaint( frame_paint, VG_FILL_PATH );
 
   vgDrawPath( frame_path, VG_FILL_PATH );
 

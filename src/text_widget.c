@@ -13,7 +13,13 @@ static float float_from_26_6( FT_Pos x )
 {
    return (float)x / 64.0f;
 }
-
+/*!
+ * This structure is attached to a FreeType "size" structure. It is
+ * only by observation that I determined that Pango tries to keep the
+ * number of Font sizes to a minimum. Therefore, I attach this mapping
+ * from the FT_Face to the OpenVG face using the spare pointer in the
+ * FT_Size structure.
+ */
 struct VG_DATA {
   VGFont font;
   uint8_t cmap[144]; // Probably should have an expandable structure. But
@@ -42,7 +48,10 @@ struct TEXT_WIDGET_PRIVATE {
   PangoFontMap* font_map;
   PangoContext* context;
   PangoLayout* layout;
+  VGPaint foreground;
 };
+
+static VGfloat DEFAULT_FOREGROUND[] = { 1.f, 1.f, 1.f, 1.f };
 
 struct TEXT_WIDGET_HANDLE text_widget_init ( int x, int y,
 					     float width_mm,
@@ -68,6 +77,9 @@ struct TEXT_WIDGET_HANDLE text_widget_init ( int x, int y,
   pango_layout_set_height( handle.d->layout,
 			   pango_units_from_double( height_pixels ) );
 
+  handle.d->foreground = vgCreatePaint();
+  vgSetParameterfv( handle.d->foreground, VG_PAINT_COLOR, 4, DEFAULT_FOREGROUND );
+
   return handle;
 }
 
@@ -84,6 +96,15 @@ void text_widget_set_alignment ( struct TEXT_WIDGET_HANDLE handle,
   case TEXT_WIDGET_ALIGN_RIGHT:
     pango_layout_set_alignment( handle.d->layout, PANGO_ALIGN_RIGHT ); break;
   }
+}
+
+void text_widget_set_foreground ( struct TEXT_WIDGET_HANDLE handle,
+				  float color[4] )
+{
+  if ( handle.d == NULL )
+    return;
+
+  vgSetParameterfv( handle.d->foreground, VG_PAINT_COLOR, 4, color );
 }
 
 void text_widget_set_text ( struct TEXT_WIDGET_HANDLE handle,
@@ -137,6 +158,10 @@ void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
   if ( handle.d == NULL || handle.d->layout == NULL )
     return;
 
+  VGPaint old_paint = vgGetPaint( VG_FILL_PATH );
+
+  vgSetPaint( handle.d->foreground, VG_FILL_PATH );
+
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
 
   vgLoadIdentity();
@@ -161,16 +186,47 @@ void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
     FT_Face face = pango_fc_font_lock_face( (PangoFcFont*)pg_font );
 
     if ( face != NULL ) {
+
       struct VG_DATA* vg_data = face->size->generic.data;
       if ( vg_data != NULL ) {
+	// About the only extra attribute we can manage is the foreground
+	// color. But, it might be nice to render a background color
+	// to see just how badly the text is fitted into the widget
+	// box.
+	GSList* attr_item = run->item->analysis.extra_attrs;
+	while ( attr_item ) {
+	  PangoAttribute* attr = attr_item->data;
+	  switch ( attr->klass->type ) {
+	  case PANGO_ATTR_FOREGROUND:
+	    {
+	      PangoColor color = ((PangoAttrColor*)attr)->color;
+	      VGfloat new_color[] = { (float)color.red / 65535.f,
+				      (float)color.green / 65535.f,
+				      (float)color.blue / 65535.f, 1.f };
+	      VGPaint new_paint = vgCreatePaint();
+	      vgSetParameterfv( new_paint, VG_PAINT_COLOR, 4, new_color );
+	      vgSetPaint( new_paint, VG_FILL_PATH );
+	      vgDestroyPaint( new_paint );
+	    }
+	    break;
+	  default:
+	    printf( "\tHmm. Unknown attribute: %d\n", attr->klass->type );
+	  }
+	  attr_item = attr_item->next;
+	}
+
 	// Note: inverted Y coordinate
-	VGfloat point[2] = { x_pixel, height-baseline_pixel };
+	VGfloat point[2] = { x_pixel, height - baseline_pixel };
 	vgSetfv( VG_GLYPH_ORIGIN, 2, point );
 	VGFont vg_font = vg_data->font;
 	int g;
 	for ( g = 0; g < run->glyphs->num_glyphs; g++ ) {
 	  vgDrawGlyph( vg_font, run->glyphs->glyphs[g].glyph, VG_FILL_PATH,
 		       VG_TRUE );
+	}
+
+	if ( vgGetPaint( VG_FILL_PATH ) != handle.d->foreground ) {
+	  vgSetPaint( handle.d->foreground, VG_FILL_PATH );
 	}
       }
       pango_fc_font_unlock_face( (PangoFcFont*)pg_font );
@@ -184,6 +240,7 @@ void text_widget_free_handle ( struct TEXT_WIDGET_HANDLE handle )
     g_object_unref( handle.d->layout );
     g_object_unref( handle.d->context );
     g_object_unref( handle.d->font_map );
+    vgDestroyPaint( handle.d->foreground );
     free( handle.d );
     handle.d = 0;
   }
