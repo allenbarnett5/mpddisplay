@@ -15,6 +15,7 @@
 #include "image_widget.h"
 #include "cover_image.h"
 #include "display_intf.h"
+#include "magick_image.h"
 
 static const char* egl_carp ( void );
 
@@ -29,8 +30,18 @@ static int window_width = 0;
 static int window_height = 0;
 // The basic decoration.
 static VGPath frame_path;
+// The background of the decoration.
+static VGPath background_path;
 // The basic decoration color.
 static VGPaint frame_paint;
+// The decoration brush image.
+static VGImage fg_brush;
+// The decoration background brush image.
+static VGImage bg_brush;
+
+// The frame texture is compiled into the code.
+extern const unsigned char _binary_pattern_png_start;
+extern const unsigned char _binary_pattern_png_end;
 
 // Rather than burying these in the code, here are some constants
 // which we can play with to make the screen look better.
@@ -275,11 +286,50 @@ int display_init ( void )
     printf( "Error: VG Couldn't clear window 0x%x\n", vgGetError() );
     return -1;
   }
-
+#if 0
   frame_paint = vgCreatePaint();
   vgSetParameterfv( frame_paint, VG_PAINT_COLOR, 4, frame_color );
+#else
+  size_t pattern_size =
+    &_binary_pattern_png_end - &_binary_pattern_png_start;
 
+  struct IMAGE_HANDLE pattern = image_rgba_create( "PNG",
+						   &_binary_pattern_png_start,
+						   pattern_size );
+  int pattern_width = image_rgba_width( pattern );
+  int pattern_height = image_rgba_height( pattern );
+  unsigned char* image = image_rgba_image( pattern );
+
+  fg_brush = vgCreateImage( VG_sRGBA_8888, pattern_width, pattern_height,
+			    VG_IMAGE_QUALITY_NONANTIALIASED );
+  vgImageSubData( fg_brush, image, pattern_width * 4,
+		  VG_sABGR_8888, 0, 0, pattern_width, pattern_height );
+
+  bg_brush = vgCreateImage( VG_sRGBA_8888, pattern_width, pattern_height,
+			    VG_IMAGE_QUALITY_NONANTIALIASED );
+  float darken[] = {
+    0.5, 0., 0., 0., // R-src -> {RGBA}-dest
+    0., 0.5, 0., 0., // G-src -> {RGBA}-dest
+    0., 0., 0.5, 0., // B-src -> {RGBA}-dest
+    0., 0., 0., 1., // A-src -> {RGBA}-dest
+    0., 0., 0., 0.  // const -> {RGBA}-dest
+  };
+
+  vgColorMatrix( bg_brush, fg_brush, darken );
+
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
+  vgLoadIdentity();
+  vgScale( 0.1, 0.1 );
+
+  frame_paint = vgCreatePaint();
+  vgSetParameteri( frame_paint, VG_PAINT_TYPE, VG_PAINT_TYPE_PATTERN );
+  vgSetParameteri( frame_paint, VG_PAINT_PATTERN_TILING_MODE,
+		   VG_TILE_REPEAT );
+
+  image_rgba_free( pattern );
+#endif
   // Prepare to draw.
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE );
   vgLoadIdentity();
   vgTranslate( vc_frame_x, vc_frame_y );
   // We should be able to draw in mm and squares should be square.
@@ -293,23 +343,33 @@ int display_init ( void )
 			     VG_PATH_CAPABILITY_ALL );
 
   vguRect( frame_path, 0.f, 0.f, tv_width, tv_height );
-#if 0
-  vguRect( frame_path, border_thickness, border_thickness,
-	   tv_width - 2.f * border_thickness,
-	   tv_height - 2.f * border_thickness );
-#else
+
   // Text box.
   vguRect( frame_path, border_thickness, border_thickness,
 	   tv_width / 2.f - border_thickness / 2.f,
 	   tv_height - 2.f * border_thickness );
+
   // Time box.
   vguRect( frame_path,
 	   tv_width / 2.f + border_thickness,
 	   border_thickness,
 	   tv_width / 2.f - 2.f * border_thickness,
 	   2.f * border_thickness );
-#endif
+
   vgDrawPath( frame_path, VG_FILL_PATH );
+
+  background_path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
+				  VG_PATH_DATATYPE_F,
+				  1.0f, 0.0f,
+				  0, 0,
+				  VG_PATH_CAPABILITY_ALL );
+  vguRect( background_path, 0.f, 0.f, tv_width, tv_height );
+#if 0
+  // Text box again.
+  vguRect( background_path, border_thickness, border_thickness,
+	   tv_width / 2.f - border_thickness / 2.f,
+	   tv_height - 2.f * border_thickness );
+#endif
 
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
 
@@ -327,11 +387,11 @@ int display_init ( void )
 				      -border_thickness * dpmm_y,
 				      tv_width/2.f, tv_height,
 				      vc_frame_width/2.f, vc_frame_height );
-
+#if 0
   float CYAN[] = { 0.f, 1.f, 1.f, 1.f };
 
   text_widget_set_foreground( metadata_widget, CYAN );
-
+#endif
   // Not sure what the parameters of this should be. A height of 35.f
   // looks ok for now, but really depends on the font.
   time_widget = text_widget_init( vc_frame_x + border_thickness * dpmm_x
@@ -365,6 +425,12 @@ int display_update ( const struct MPD_CURRENT* current )
   vgClear( 0, 0, window_width, window_height );
 
   vgSetPaint( frame_paint, VG_FILL_PATH );
+
+  vgPaintPattern( frame_paint, bg_brush );
+
+  vgDrawPath( background_path, VG_FILL_PATH );
+
+  vgPaintPattern( frame_paint, fg_brush );
 
   vgDrawPath( frame_path, VG_FILL_PATH );
 

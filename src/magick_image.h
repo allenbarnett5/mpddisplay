@@ -23,6 +23,13 @@ struct IMAGE_HANDLE {
 struct IMAGE_HANDLE image_rgba_create ( const char* type,
 					const unsigned char* data,
 					size_t n_bytes );
+
+/*!
+ * Release any resources associated with the image.
+ * \param handle the image to free.
+ */
+void image_rgba_free ( struct IMAGE_HANDLE handle );
+
 /*!
  * So many layers of indirection just to get the image width.
  */

@@ -14,8 +14,6 @@ struct IMAGE_HANDLE_PRIVATE {
   void (*finalizer) ( struct IMAGE_HANDLE );
 };
 
-static void image_rgba_free ( struct IMAGE_HANDLE );
-
 struct IMAGE_HANDLE image_rgba_create ( const char* type,
 					const unsigned char* data,
 					size_t n_bytes )
@@ -67,7 +65,7 @@ unsigned char* image_rgba_image ( struct IMAGE_HANDLE handle )
   return NULL;
 }
 
-static void image_rgba_free ( struct IMAGE_HANDLE handle )
+void image_rgba_free ( struct IMAGE_HANDLE handle )
 {
   if ( handle.d ) {
     if ( handle.d->image ) {
