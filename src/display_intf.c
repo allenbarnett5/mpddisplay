@@ -64,8 +64,6 @@ static const VGfloat dpmm_x = 698./95.25; // vc_frame_width / tv_width;
 static const VGfloat dpmm_y = 461./53.975; // vc_frame_height / tv_height;
 // Background color and alpha
 static const VGfloat background[] = { 0.f, 0.f, 0.f, 1.f };
-// Frame color (although this will eventually be a texture).
-static VGfloat frame_color[] = { 0.f, 1.f, 1.f, 1.f };
 
 // The size of border decoration in mm.
 static const VGfloat border_thickness = 2.f;
@@ -144,15 +142,7 @@ int display_init ( void )
   src_rect.y = 0;
   src_rect.width = window_width << 16;
   src_rect.height = window_height << 16;
-#if 1
-  // The default for the window is to let any lower window appear
-  // where the alpha of this window is < 1.0. However, you also
-  // have to ask for a EGL context with an alpha in order for this
-  // layer to not be opaque anyway.
-  VC_DISPMANX_ALPHA_T alpha = { DISPMANX_FLAGS_ALPHA_FROM_SOURCE /*| DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS*/, 
-				255, /*alpha 0->255*/
-				0 };
-#endif
+
   DISPMANX_ELEMENT_HANDLE_T dspmx_element;
   dspmx_element = vc_dispmanx_element_add( dspmx_update,
 					   dspmx_display,
@@ -161,11 +151,7 @@ int display_init ( void )
 					   0, /* src */
 					   &src_rect,
 					   DISPMANX_PROTECTION_NONE,
-#if 1
-					   &alpha, /* alpha */
-#else
 					   0, /* alpha */
-#endif
 					   0, /* clamp */
 					   0  /* transform */ );
   if ( dspmx_element == DISPMANX_NO_HANDLE ) {
@@ -286,10 +272,7 @@ int display_init ( void )
     printf( "Error: VG Couldn't clear window 0x%x\n", vgGetError() );
     return -1;
   }
-#if 0
-  frame_paint = vgCreatePaint();
-  vgSetParameterfv( frame_paint, VG_PAINT_COLOR, 4, frame_color );
-#else
+
   size_t pattern_size =
     &_binary_pattern_png_end - &_binary_pattern_png_start;
 
@@ -327,7 +310,7 @@ int display_init ( void )
 		   VG_TILE_REPEAT );
 
   image_rgba_free( pattern );
-#endif
+
   // Prepare to draw.
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE );
   vgLoadIdentity();
@@ -364,12 +347,6 @@ int display_init ( void )
 				  0, 0,
 				  VG_PATH_CAPABILITY_ALL );
   vguRect( background_path, 0.f, 0.f, tv_width, tv_height );
-#if 0
-  // Text box again.
-  vguRect( background_path, border_thickness, border_thickness,
-	   tv_width / 2.f - border_thickness / 2.f,
-	   tv_height - 2.f * border_thickness );
-#endif
 
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
 
@@ -387,11 +364,7 @@ int display_init ( void )
 				      -border_thickness * dpmm_y,
 				      tv_width/2.f, tv_height,
 				      vc_frame_width/2.f, vc_frame_height );
-#if 0
-  float CYAN[] = { 0.f, 1.f, 1.f, 1.f };
 
-  text_widget_set_foreground( metadata_widget, CYAN );
-#endif
   // Not sure what the parameters of this should be. A height of 35.f
   // looks ok for now, but really depends on the font.
   time_widget = text_widget_init( vc_frame_x + border_thickness * dpmm_x

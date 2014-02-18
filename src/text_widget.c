@@ -158,8 +158,6 @@ void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
   if ( handle.d == NULL || handle.d->layout == NULL )
     return;
 
-  VGPaint old_paint = vgGetPaint( VG_FILL_PATH );
-
   vgSetPaint( handle.d->foreground, VG_FILL_PATH );
 
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
