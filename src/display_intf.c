@@ -39,6 +39,11 @@ static VGImage fg_brush;
 // The decoration background brush image.
 static VGImage bg_brush;
 
+static VGPath thermometer_path;
+static VGPaint thermometer_paint;
+// Background color and alpha
+static const VGfloat thermometer_color[] = { 0.f, 0.75f, 1.f, 0.3f };
+
 // The frame texture is compiled into the code.
 extern const unsigned char _binary_pattern_png_start;
 extern const unsigned char _binary_pattern_png_end;
@@ -318,6 +323,20 @@ int display_init ( void )
   // We should be able to draw in mm and squares should be square.
   vgScale( dpmm_x, dpmm_y );
 
+  // The background is a dark brushed metal.
+  background_path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
+				  VG_PATH_DATATYPE_F,
+				  1.0f, 0.0f,
+				  0, 0,
+				  VG_PATH_CAPABILITY_ALL );
+  vguRect( background_path, 0.f, 0.f, tv_width, tv_height );
+
+  vgSetPaint( frame_paint, VG_FILL_PATH );
+
+  vgPaintPattern( frame_paint, bg_brush );
+
+  vgDrawPath( background_path, VG_FILL_PATH );
+
   // Define the main frame.
   frame_path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
 			     VG_PATH_DATATYPE_F,
@@ -333,20 +352,29 @@ int display_init ( void )
 	   tv_height - 2.f * border_thickness );
 
   // Time box.
-  vguRect( frame_path,
-	   tv_width / 2.f + border_thickness,
-	   border_thickness,
-	   tv_width / 2.f - 2.f * border_thickness,
-	   2.f * border_thickness );
+  vguRoundRect( frame_path, 
+		tv_width / 2.f + border_thickness,
+		border_thickness,
+		( tv_width / 2.f - 2.f * border_thickness ) / 1.f,
+		2.f * border_thickness,
+		2.f * border_thickness, 2.f * border_thickness );
+
+  vgSetPaint( frame_paint, VG_FILL_PATH );
+
+  vgPaintPattern( frame_paint, bg_brush );
 
   vgDrawPath( frame_path, VG_FILL_PATH );
 
-  background_path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
-				  VG_PATH_DATATYPE_F,
-				  1.0f, 0.0f,
-				  0, 0,
-				  VG_PATH_CAPABILITY_ALL );
-  vguRect( background_path, 0.f, 0.f, tv_width, tv_height );
+
+  thermometer_path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
+				   VG_PATH_DATATYPE_F,
+				   1.0f, 0.0f,
+				   0, 0,
+				   VG_PATH_CAPABILITY_ALL );
+
+  thermometer_paint = vgCreatePaint();
+
+  vgSetParameterfv( thermometer_paint, VG_PAINT_COLOR, 4, thermometer_color );
 
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
 
@@ -434,7 +462,26 @@ int display_update ( const struct MPD_CURRENT* current )
     text_widget_set_text( time_widget, w_buf );
 
     g_string_free( w_buf, TRUE );
+
+    vgClearPath( thermometer_path, VG_PATH_CAPABILITY_ALL );
+
+    if ( current->total_time > 0 ) {
+      VGfloat thermometer_width =
+	(float)current->elapsed_time / (float)current->total_time *
+	( tv_width / 2.f - 2.f * border_thickness );
+
+      vguRoundRect( thermometer_path, 
+		    tv_width / 2.f + border_thickness,
+		    border_thickness,
+		    thermometer_width,
+		    2.f * border_thickness,
+		    2.f * border_thickness, 2.f * border_thickness );
+    }
   }
+
+  vgSetPaint( thermometer_paint, VG_FILL_PATH );
+
+  vgDrawPath( thermometer_path, VG_FILL_PATH );
 
   text_widget_draw_text( metadata_widget );
 
