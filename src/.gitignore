@@ -3,3 +3,5 @@
 mpddisplay
 *.[od]
 *~
+# Still, this needs to be backed up somehow...
+album_art.sqlite3
