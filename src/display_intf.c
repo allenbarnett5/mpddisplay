@@ -365,7 +365,6 @@ int display_init ( void )
 
   vgDrawPath( frame_path, VG_FILL_PATH );
 
-
   thermometer_path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
 				   VG_PATH_DATATYPE_F,
 				   1.0f, 0.0f,
@@ -374,7 +373,22 @@ int display_init ( void )
 
   thermometer_paint = vgCreatePaint();
 
-  vgSetParameterfv( thermometer_paint, VG_PAINT_COLOR, 4, thermometer_color );
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
+  vgLoadIdentity();
+
+  vgSetParameteri( thermometer_paint, VG_PAINT_TYPE, VG_PAINT_TYPE_LINEAR_GRADIENT );
+  VGfloat gradient_points[] = { 0.f,       border_thickness,
+				0.f, 3.f * border_thickness };
+  vgSetParameterfv( thermometer_paint, VG_PAINT_LINEAR_GRADIENT,
+		    4, gradient_points );
+  float fill_stops[] = {
+    0., 0., 0.75, 1., 0.01,
+    0.25, 0., 0.75, 1., 0.7,
+    0.5, 0., 0.75, 1., 0.3,
+    1., 0., 0.75, 1., 0.0,
+  };
+  vgSetParameterfv( thermometer_paint, VG_PAINT_COLOR_RAMP_STOPS,
+		    4 * 5, fill_stops );
 
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
 
@@ -425,6 +439,10 @@ int display_update ( const struct MPD_CURRENT* current )
 
   vgClear( 0, 0, window_width, window_height );
 
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
+  vgLoadIdentity();
+  vgScale( 0.1, 0.1 );
+
   vgSetPaint( frame_paint, VG_FILL_PATH );
 
   vgPaintPattern( frame_paint, bg_brush );
@@ -468,16 +486,19 @@ int display_update ( const struct MPD_CURRENT* current )
     if ( current->total_time > 0 ) {
       VGfloat thermometer_width =
 	(float)current->elapsed_time / (float)current->total_time *
-	( tv_width / 2.f - 2.f * border_thickness );
+	( tv_width / 2.f - 2.f * border_thickness - 0.2f * border_thickness );
 
       vguRoundRect( thermometer_path, 
-		    tv_width / 2.f + border_thickness,
+		    tv_width / 2.f + 1.1 * border_thickness,
 		    border_thickness,
 		    thermometer_width,
 		    2.f * border_thickness,
 		    2.f * border_thickness, 2.f * border_thickness );
     }
   }
+
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
+  vgLoadIdentity();
 
   vgSetPaint( thermometer_paint, VG_FILL_PATH );
 
