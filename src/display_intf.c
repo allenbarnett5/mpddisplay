@@ -361,7 +361,7 @@ int display_init ( void )
 
   vgSetPaint( frame_paint, VG_FILL_PATH );
 
-  vgPaintPattern( frame_paint, bg_brush );
+  vgPaintPattern( frame_paint, fg_brush );
 
   vgDrawPath( frame_path, VG_FILL_PATH );
 
@@ -389,13 +389,6 @@ int display_init ( void )
   };
   vgSetParameterfv( thermometer_paint, VG_PAINT_COLOR_RAMP_STOPS,
 		    4 * 5, fill_stops );
-
-  EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
-
-  if ( swapped == EGL_FALSE ) {
-    printf( "Error: Could not swap EGL buffers: %s\n", egl_carp() );
-    return -1;
-  }
 
   // \bug need to think more deeply about what the right description
   // of the text box should be passed to the widget. The font cares
@@ -429,6 +422,13 @@ int display_init ( void )
   cover_widget = image_widget_init( iw_x_pix, iw_y_pix,
 				    iw_width_mm, iw_height_mm,
 				    iw_width_pix, iw_height_pix );
+
+  EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
+
+  if ( swapped == EGL_FALSE ) {
+    printf( "Error: Could not swap EGL buffers: %s\n", egl_carp() );
+    return -1;
+  }
 
   return 0;
 }
