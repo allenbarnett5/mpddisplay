@@ -3,9 +3,9 @@
  */
 #ifndef MAGICK_IMAGE_H
 #define MAGICK_IMAGE_H
-
+#if 0
 #include <stddef.h>
-
+#endif
 struct IMAGE_HANDLE {
   struct IMAGE_HANDLE_PRIVATE* d;
 };

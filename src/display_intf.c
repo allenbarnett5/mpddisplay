@@ -10,6 +10,8 @@
 #include "VG/openvg.h"
 #include "VG/vgu.h"
 
+#include "glib.h"
+
 #include "mpd_intf.h"
 #include "text_widget.h"
 #include "image_widget.h"
@@ -432,7 +434,7 @@ int display_init ( void )
 
   return 0;
 }
-
+#if 0
 int display_update ( const struct MPD_CURRENT* current )
 {
   // For now, this is very simple. Redraw the whole screen.
@@ -463,7 +465,7 @@ int display_update ( const struct MPD_CURRENT* current )
 
     GString* w_buf = g_string_new( buffer ); // For counting the characters.
 
-    text_widget_set_text( metadata_widget, w_buf );
+    text_widget_set_text( metadata_widget, w_buf->str, w_buf->len );
 
     g_string_free( w_buf, TRUE );
   }
@@ -477,7 +479,7 @@ int display_update ( const struct MPD_CURRENT* current )
 			       current->total_time % 60 );
     GString* w_buf = g_string_new( buffer ); // For counting the characters.
 
-    text_widget_set_text( time_widget, w_buf );
+    text_widget_set_text( time_widget, w_buf->str, w_buf->len );
 
     g_string_free( w_buf, TRUE );
 
@@ -511,6 +513,123 @@ int display_update ( const struct MPD_CURRENT* current )
   if ( current->changed & MPD_CHANGED_ALBUM ) {
     struct IMAGE_HANDLE cover_image_handle =
       cover_image( current->artist->str, current->album->str );
+    image_widget_set_image( cover_widget, cover_image_handle );
+  }
+
+  image_widget_draw_image( cover_widget );
+
+  EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
+
+  if ( swapped == EGL_FALSE ) {
+    printf( "Error: Could not swap EGL buffers: %s\n", egl_carp() );
+    return -1;
+  }
+
+  return 0;
+}
+#endif
+int display_update2 ( const struct MPD_HANDLE handle )
+{
+  // For now, this is very simple. Redraw the whole screen.
+
+  vgClear( 0, 0, window_width, window_height );
+
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
+  vgLoadIdentity();
+  vgScale( 0.1, 0.1 );
+
+  vgSetPaint( frame_paint, VG_FILL_PATH );
+
+  vgPaintPattern( frame_paint, bg_brush );
+
+  vgDrawPath( background_path, VG_FILL_PATH );
+
+  vgPaintPattern( frame_paint, fg_brush );
+
+  vgDrawPath( frame_path, VG_FILL_PATH );
+#if 0
+  if ( current->changed &
+       ( MPD_CHANGED_ARTIST | MPD_CHANGED_ALBUM | MPD_CHANGED_TITLE ) ) {
+    char* buffer =
+      g_markup_printf_escaped( "<span font=\"Droid Sans 26px\">%s\n<i>%s</i>\n<b>%s</b></span>",
+			       current->artist->str,
+			       current->album->str,
+			       current->title->str );
+#else
+    if ( mpd_changed( handle,
+		      MPD_CHANGED_ARTIST | MPD_CHANGED_ALBUM | MPD_CHANGED_TITLE ) ) {
+    char* buffer =
+      g_markup_printf_escaped( "<span font=\"Droid Sans 26px\">%s\n<i>%s</i>\n<b>%s</b></span>",
+			       mpd_artist( handle ),
+			       mpd_album( handle ),
+			       mpd_title( handle ) );
+#endif
+
+    GString* w_buf = g_string_new( buffer ); // For counting the characters.
+
+    text_widget_set_text( metadata_widget, w_buf->str, w_buf->len );
+
+    g_string_free( w_buf, TRUE );
+  }
+#if 0
+  if ( current->changed & ( MPD_CHANGED_ELAPSED | MPD_CHANGED_TOTAL ) ) {
+    char* buffer =
+      g_markup_printf_escaped( "<span font=\"Droid Sans 26px\">%02d:%02d / %02d:%02d</span>",
+			       current->elapsed_time / 60,
+			       current->elapsed_time % 60,
+			       current->total_time / 60,
+			       current->total_time % 60 );
+#else
+    struct MPD_TIMES times = mpd_times( handle );
+
+    if ( mpd_changed( handle,
+		      MPD_CHANGED_ELAPSED | MPD_CHANGED_TOTAL ) ) {
+    char* buffer =
+      g_markup_printf_escaped( "<span font=\"Droid Sans 26px\">%02ld:%02ld / %02ld:%02ld</span>",
+			       times.elapsed / 60,
+			       times.elapsed % 60,
+			       times.total / 60,
+			       times.total % 60 );
+#endif
+    GString* w_buf = g_string_new( buffer ); // For counting the characters.
+
+    text_widget_set_text( time_widget, w_buf->str, w_buf->len );
+
+    g_string_free( w_buf, TRUE );
+
+    vgClearPath( thermometer_path, VG_PATH_CAPABILITY_ALL );
+
+    if ( times.total > 0 ) {
+      VGfloat thermometer_width =
+	(float)times.elapsed / (float)times.total *
+	( tv_width / 2.f - 2.f * border_thickness - 0.2f * border_thickness );
+
+      vguRoundRect( thermometer_path, 
+		    tv_width / 2.f + 1.1 * border_thickness,
+		    border_thickness,
+		    thermometer_width,
+		    2.f * border_thickness,
+		    2.f * border_thickness, 2.f * border_thickness );
+    }
+  }
+
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
+  vgLoadIdentity();
+
+  vgSetPaint( thermometer_paint, VG_FILL_PATH );
+
+  vgDrawPath( thermometer_path, VG_FILL_PATH );
+
+  text_widget_draw_text( metadata_widget );
+
+  text_widget_draw_text( time_widget );
+#if 0
+  if ( current->changed & MPD_CHANGED_ALBUM ) {
+#else
+    if ( mpd_changed( handle, MPD_CHANGED_ALBUM ) ) {
+#endif
+    struct IMAGE_HANDLE cover_image_handle =
+      cover_image( mpd_artist( handle ), mpd_album( handle ) );
     image_widget_set_image( cover_widget, cover_image_handle );
   }
 

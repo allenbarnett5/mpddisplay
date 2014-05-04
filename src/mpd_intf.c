@@ -8,10 +8,40 @@
 #include <errno.h>
 #include <netdb.h>
 #include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <stdbool.h>
-
+#include "glib.h"
 #include "mpd_intf.h"
+
+/*!
+ * This is the structure which is populated by mpd_get_current method.
+ * changed notes of any fields are different from the last time
+ * mpd_get_current was called.
+ */
+struct MPD_CURRENT {
+  //! Bitmap of changed values.
+  int changed;
+  //! Play status.
+  enum MPD_PLAY_STATUS play_status;
+  //! The artist (UTF-8)
+  GString* artist;
+  //! The album (UTF-8)
+  GString* album;
+  //! The title (UTF-8)
+  GString* title;
+  //! Elapsed time in seconds.
+  int elapsed_time;
+  //! Total track time in seconds.
+  int total_time;
+};
+
+struct MPD_PRIVATE {
+  int fd;
+  GString* host;
+  GString* port;
+  struct MPD_CURRENT current;
+};
+
 
 static ssize_t read_line( int fd, void* buffer, size_t n );
 static int put_line ( int fd, void* buffer, size_t n );
@@ -168,6 +198,9 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
   while ( ( n_read = read_line( mpd, buffer, sizeof buffer ) ) != -1 ) {
     // \bug if n_read == 0, then we got EOF on the socket. Which is kind of
     // an error...
+    if ( n_read == 0 ) {
+      return -1;
+    }
 #if 0
     printf( "SR: %s", buffer );
 #endif
@@ -362,4 +395,95 @@ static int put_line ( int fd, void* buffer, size_t n )
   }
 
   return total_written;
+}
+
+struct MPD_HANDLE mpd_create ( const char* host, const char* port )
+{
+  struct MPD_HANDLE handle;
+  handle.d = malloc( sizeof( struct MPD_PRIVATE ) );
+  handle.d->fd   = -1;
+  handle.d->host = g_string_new( host );
+  handle.d->port = g_string_new( port );
+
+  mpd_current_init( &handle.d->current );
+
+  handle.d->fd = mpd_connect( handle.d->host->str, handle.d->port->str );
+
+  return handle;
+}
+
+int mpd_status ( const struct MPD_HANDLE handle )
+{
+  int status = -1;
+  if ( handle.d != 0 ) {
+    status = handle.d->fd; // Not much of a status.
+  }
+  return status;
+}
+
+void mpd_free ( struct MPD_HANDLE handle )
+{
+  if ( handle.d != 0 ) {
+    mpd_current_free( &handle.d->current );
+    g_string_free( handle.d->port, TRUE );
+    g_string_free( handle.d->host, TRUE );
+    if ( handle.d->fd > -1 ) {
+      close(  handle.d->fd );
+    }
+  }
+}
+
+int mpd_poll ( struct MPD_HANDLE handle )
+{
+  int status = -1;
+  if ( handle.d != 0 ) {
+    status = mpd_get_current( handle.d->fd, &handle.d->current );
+  }
+  return status;
+}
+
+bool mpd_changed ( const struct MPD_HANDLE handle, int flags )
+{
+  bool changed = false;
+  if ( handle.d != 0 ) {
+    changed = handle.d->current.changed & flags;
+  }
+  return changed;
+}
+
+char* mpd_artist ( const struct MPD_HANDLE handle )
+{
+  char* artist = 0;
+  if ( handle.d != 0 ) {
+    artist = handle.d->current.artist->str;
+  }
+  return artist;
+}
+
+char* mpd_album ( const struct MPD_HANDLE handle )
+{
+  char* album = 0;
+  if ( handle.d != 0 ) {
+    album = handle.d->current.album->str;
+  }
+  return album;
+}
+
+char* mpd_title ( const struct MPD_HANDLE handle )
+{
+  char* title = 0;
+  if ( handle.d != 0 ) {
+    title = handle.d->current.title->str;
+  }
+  return title;
+}
+
+struct MPD_TIMES mpd_times ( const struct MPD_HANDLE handle )
+{
+  struct MPD_TIMES times = { 0, 0 };
+  if ( handle.d != 0 ) {
+    times.elapsed = handle.d->current.elapsed_time;
+    times.total   = handle.d->current.total_time;
+  }
+  return times;
 }

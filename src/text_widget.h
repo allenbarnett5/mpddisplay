@@ -4,9 +4,9 @@
  */
 #ifndef TEXT_WIDGET_H
 #define TEXT_WIDGET_H
-
+#if 0
 #include "glib.h"
-
+#endif
 struct TEXT_WIDGET_PRIVATE;
 
 struct TEXT_WIDGET_HANDLE {
@@ -56,9 +56,10 @@ void text_widget_set_foreground( struct TEXT_WIDGET_HANDLE handle,
  * Layout this text. Could have Pango markup to make it attractive.
  * \param[inout] handle the text widget.
  * \param[in] text the new string to display.
+ * \param[in] length the number of bytes in text.
  */
 void text_widget_set_text ( struct TEXT_WIDGET_HANDLE handle,
-			    const GString* text );
+			    const char* text, int length );
 
 /*!
  * Draw the text. The OpenVG context should be all set up to

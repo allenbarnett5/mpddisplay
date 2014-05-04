@@ -3,9 +3,9 @@
  */
 #ifndef VG_FONT_H
 #define VG_FONT_H
-
+#if 0
 #include "glib.h"
-
+#endif
 struct VG_FONT_PRIVATE;
 
 struct VG_FONT_HANDLE {
@@ -29,7 +29,7 @@ struct VG_FONT_HANDLE* vg_font_init ( const char* font_file,
  * \return the line spacing for the font (at the current size).
  */
 float vg_font_line_height ( struct VG_FONT_HANDLE* font );
-
+#if 0
 /*!
  * Draw the string.
  * \param font font info.
@@ -40,7 +40,7 @@ float vg_font_line_height ( struct VG_FONT_HANDLE* font );
 void vg_font_draw_string ( struct VG_FONT_HANDLE* font,
 			   float x, float y,
 			   const GString* string );
-			   
+#endif			   
 /*!
  * Release any memory held by the handle.
  */

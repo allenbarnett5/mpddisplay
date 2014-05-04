@@ -24,8 +24,11 @@ static gboolean reconnect_mpd ( gpointer data );
 const char* USAGE = "usage: %s [--host hostname] [--port port#]\n";
 
 struct MAIN_DATA {
+  struct MPD_HANDLE mpd2;
+#if 0
   int mpd;
   struct MPD_CURRENT current;
+#endif
   GMainLoop* loop;
 } main_data;
 
@@ -86,14 +89,21 @@ int main ( int argc, char* argv[] )
 
   printf( "MPD host: '%s'\n", host );
   printf( "MPD port: '%s'\n", port );
-
+#if 0
   main_data.mpd = mpd_connect( host, port );
-
+#endif
+  main_data.mpd2 = mpd_create( host, port );
+#if 0
   if ( main_data.mpd < 0 ) {
     printf( USAGE, argv[0] );
     return 1;
   }
-
+#else
+  if ( mpd_status( main_data.mpd2 ) < 0 ) {
+    printf( USAGE, argv[0] );
+    return 1;
+  }
+#endif
   // If we get this far, we can try to initialize the graphics.
 
   int ret = display_init();
@@ -103,9 +113,9 @@ int main ( int argc, char* argv[] )
   }
 
   // Well, after all that, we can now start polling MPD to see what's up.
-
+#if 0
   mpd_current_init( &main_data.current );
-
+#endif
   main_data.loop = g_main_loop_new( NULL, FALSE );
 
   (void)g_timeout_add_seconds( 1, poll_mpd, &main_data );
@@ -113,8 +123,10 @@ int main ( int argc, char* argv[] )
   g_main_loop_run( main_data.loop );
 
   g_main_loop_unref( main_data.loop );
-
+#if 0
   mpd_close( main_data.mpd );
+#endif
+  mpd_free( main_data.mpd2 );
 
   display_close();
 
@@ -153,7 +165,7 @@ gboolean reconnect_mpd ( gpointer data )
 gboolean poll_mpd ( gpointer data )
 {
   struct MAIN_DATA* main_data = data;
-
+#if 0
   int status = mpd_get_current( main_data->mpd, &main_data->current );
 
   if ( status != 0 ) {
@@ -168,6 +180,21 @@ gboolean poll_mpd ( gpointer data )
       return TRUE;
     }
   }
+#else
+  printf( "Polling mpd\n" );
+  int status = mpd_poll( main_data->mpd2 );
+  printf( "Polled mpd: %d\n", status );
 
+  if ( status != 0 ) {
+    printf( "We lost our connection to MPD. Trying again shortly.\n" );
+    (void)g_timeout_add_seconds( 5, reconnect_mpd, data );
+    return FALSE;
+  }
+
+  if ( mpd_changed( main_data->mpd2, MPD_CHANGED_ANY ) ) {
+    if ( display_update2( main_data->mpd2 ) < 0 ) {
+    }
+  }
+#endif
   return TRUE;
 }

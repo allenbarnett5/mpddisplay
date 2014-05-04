@@ -97,7 +97,7 @@ float vg_font_line_height ( struct VG_FONT_HANDLE* handle )
 {
   return float_from_26_6( handle->d->face->size->metrics.height );
 }
-
+#if 0
 void vg_font_draw_string ( struct VG_FONT_HANDLE* handle,
 			   float x, float y,
 			   const GString* string )
@@ -135,13 +135,15 @@ void vg_font_draw_string ( struct VG_FONT_HANDLE* handle,
     }
   }
 
+  // \bug this should use the individual glyph spacing provided by
+  // Pango.
   VGfloat point[2] = { x, y };
   vgSetfv( VG_GLYPH_ORIGIN, 2, point );
   vgDrawGlyphs( handle->d->font, n_char, utf32, 0, 0, VG_FILL_PATH, VG_TRUE );
 
   free( utf32 );
 }
-
+#endif
 void vg_font_free_handle ( struct VG_FONT_HANDLE* handle )
 {
   vgDestroyFont( handle->d->font );

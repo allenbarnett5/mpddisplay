@@ -7,6 +7,8 @@
 #include "pango/pangoft2.h"
 #include "VG/openvg.h"
 
+#include "glib.h"
+
 #include "text_widget.h"
 
 static float float_from_26_6( FT_Pos x )
@@ -108,12 +110,12 @@ void text_widget_set_foreground ( struct TEXT_WIDGET_HANDLE handle,
 }
 
 void text_widget_set_text ( struct TEXT_WIDGET_HANDLE handle,
-			    const GString* text )
+			    const char* text, int length )
 {
   if ( handle.d == NULL || handle.d->layout == NULL )
     return;
 
-  pango_layout_set_markup( handle.d->layout, text->str, text->len );
+  pango_layout_set_markup( handle.d->layout, text, length );
 
   // The idea here is to make sure that the VGFont contains
   // all the glyphs at the proper size so that when we want
