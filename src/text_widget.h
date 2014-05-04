@@ -4,9 +4,7 @@
  */
 #ifndef TEXT_WIDGET_H
 #define TEXT_WIDGET_H
-#if 0
-#include "glib.h"
-#endif
+
 struct TEXT_WIDGET_PRIVATE;
 
 struct TEXT_WIDGET_HANDLE {

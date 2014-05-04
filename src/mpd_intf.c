@@ -46,7 +46,7 @@ struct MPD_PRIVATE {
 static ssize_t read_line( int fd, void* buffer, size_t n );
 static int put_line ( int fd, void* buffer, size_t n );
 
-int mpd_connect ( const char* host, const char* port )
+static int mpd_connect ( const char* host, const char* port )
 {
   int mpd = -1; // Assume the worst.
 
@@ -134,7 +134,7 @@ int mpd_connect ( const char* host, const char* port )
   return mpd;
 }
 
-void mpd_current_init ( struct MPD_CURRENT* current )
+static void mpd_current_init ( struct MPD_CURRENT* current )
 {
   current->changed = 0;
   current->play_status = MPD_PLAY_STATUS_NOSONG;
@@ -145,14 +145,14 @@ void mpd_current_init ( struct MPD_CURRENT* current )
   current->total_time = 0;
 }
 
-void mpd_current_free ( struct MPD_CURRENT* current )
+static void mpd_current_free ( struct MPD_CURRENT* current )
 {
   g_string_free( current->artist, TRUE );
   g_string_free( current->album, TRUE );
   g_string_free( current->title, TRUE );
 }
 
-int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
+static int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
 {
   // So, this is the nub of it. Send a command to MPD and await its
   // response.
@@ -201,9 +201,7 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
     if ( n_read == 0 ) {
       return -1;
     }
-#if 0
-    printf( "SR: %s", buffer );
-#endif
+
     if ( n_read > 1 && strncmp( "OK", buffer, 2 ) == 0 ) {
       break;
     }
@@ -298,14 +296,6 @@ int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
   mpd_current_free( &current ); // This is something of an annoyance.
 
   return 0;
-}
-
-void mpd_close ( int mpd )
-{
-  // I guess this could fail, but what do you do? There's no state we
-  // care about preserving. \bug Maybe we should send the "close"
-  // command. Not that MPD appears to care, though.
-  close( mpd );
 }
 
 static ssize_t read_line( int fd, void* buffer, size_t n )

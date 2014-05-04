@@ -11,9 +11,9 @@ CFLAGS = -g -Wall -Wextra -MMD \
 -I /usr/include/freetype2 \
 -I /usr/include/ImageMagick
 
-mpddisplay: main.o mpd_intf.o display_intf.o vg_font.o text_widget.o \
+mpddisplay: main.o mpd_intf.o display_intf.o text_widget.o \
 magick_image.o cover_image.o no_cover.o image_widget.o pattern.o
-	gcc -o mpddisplay main.o mpd_intf.o display_intf.o vg_font.o \
+	gcc -o mpddisplay main.o mpd_intf.o display_intf.o \
 text_widget.o magick_image.o cover_image.o no_cover.o image_widget.o \
 pattern.o \
 -L /opt/vc/lib -lGLESv2  -lpangoft2-1.0 -lpango-1.0 -lfreetype -lglib-2.0 \

@@ -7,9 +7,7 @@
 
 #include <stdbool.h>
 #include <time.h>
-#if 0
-#include "glib.h"
-#endif
+
 struct MPD_PRIVATE;
 
 struct MPD_HANDLE {
@@ -44,63 +42,6 @@ struct MPD_TIMES {
   time_t elapsed;
   time_t total;
 };
-#if 0
-/*!
- * This is the structure which is populated by mpd_get_current method.
- * changed notes of any fields are different from the last time
- * mpd_get_current was called.
- */
-struct MPD_CURRENT {
-  //! Bitmap of changed values.
-  int changed;
-  //! Play status.
-  enum MPD_PLAY_STATUS play_status;
-  //! The artist (UTF-8)
-  GString* artist;
-  //! The album (UTF-8)
-  GString* album;
-  //! The title (UTF-8)
-  GString* title;
-  //! Elapsed time in seconds.
-  int elapsed_time;
-  //! Total track time in seconds.
-  int total_time;
-};
-
-
-/*!
- * Connect to the music player daemon on the given host at the
- * given port.
- * \param[in] host the host name.
- * \param[in] port the port (well, really this is the "service" passed
- * to getaddrinfo()).
- * \return socket fd if everything went OK. If less than zero,
- * then something went wrong.
- */
-int mpd_connect ( const char* host, const char* port );
-/*!
- * Some initialization is required.
- */
-void mpd_current_init ( struct MPD_CURRENT* current );
-/*!
- * Retrieve information about the current state of the player. previous
- * is updated with the current information.
- * \param[in] mfd socket fd for connection.
- * \param[inout] previous the previous status.
- * \return zero if everything went OK.
- */
-int mpd_get_current ( int mfd, struct MPD_CURRENT* previous );
-/*!
- * And some un-initialization is required.
- */
-void mpd_current_free ( struct MPD_CURRENT* current );
-/*!
- * Ordinarily, this program will run forever, so hopefully this is
- * never used. But, we might drop the network connection or some
- * such
- */
-void mpd_close ( int mfd );
-#endif
 /*!
  * Connect to the music player daemon on the given host at the
  * given port.

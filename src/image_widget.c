@@ -57,16 +57,7 @@ void image_widget_set_image ( struct IMAGE_WIDGET_HANDLE handle,
        handle.d->image_height == 0 ||
        image_data == NULL )
     return;
-#if 0
-  handle.d->image = vgCreateImage( VG_sRGBA_8888, image_width, image_height,
-				   VG_IMAGE_QUALITY_BETTER );
 
-  vgImageSubData( handle.d->image, image_data, image_width * 4,
-		  VG_sABGR_8888, 0, 0, image_width, image_height );
-
-  handle.d->scale_x = (float)handle.d->width_pixels/handle.d->image_width;
-  handle.d->scale_y = -(float)handle.d->height_pixels/handle.d->image_height;
-#else
   handle.d->image = vgCreateImage( VG_sRGBA_8888, image_width, image_height,
 				   VG_IMAGE_QUALITY_BETTER );
 
@@ -75,6 +66,8 @@ void image_widget_set_image ( struct IMAGE_WIDGET_HANDLE handle,
 
   vgImageSubData( base, image_data, image_width * 4,
 		  VG_sABGR_8888, 0, 0, image_width, image_height );
+
+  // Make the image a bit transparent.
 
   float more_transparent[] = {
     1., 0., 0., 0., // R-src -> {RGBA}-dest
@@ -90,7 +83,6 @@ void image_widget_set_image ( struct IMAGE_WIDGET_HANDLE handle,
 
   handle.d->scale_x = (float)handle.d->width_pixels/handle.d->image_width;
   handle.d->scale_y = -(float)handle.d->height_pixels/handle.d->image_height;
-#endif
 }
 
 void image_widget_draw_image ( struct IMAGE_WIDGET_HANDLE handle )
