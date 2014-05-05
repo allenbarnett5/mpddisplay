@@ -52,8 +52,16 @@ struct MPD_TIMES {
  */
 struct MPD_HANDLE mpd_create ( const char* host, const char* port );
 /*!
+ * Somehow we lost our connection, so we try to connect again.
+ * \param[in,out] handle MPD connection.
+ * \return < 0 if we failed to recover the connection (otherwise
+ * returns the file descriptor of the MPD connection).
+ */
+int mpd_reconnect ( struct MPD_HANDLE handle );
+/*!
  * \param[in] handle MPD connection.
- * \return the status of the MPD connection. < 0 is bad.
+ * \return the status of the MPD connection. < 0 is bad (otherwise
+ * returns the file descriptor of the MPD connection).
  */
 int mpd_status ( const struct MPD_HANDLE handle );
 /*!

@@ -140,9 +140,14 @@ static int convert_int ( const char* string )
 
 gboolean reconnect_mpd ( gpointer data )
 {
-  // \bug this is not right, of couse, we have to figure out
-  // if we can call mpd_connect again.
-  printf( "Connected to MPD again!\n" );
+  struct MAIN_DATA* main_data = data;
+  int status;
+  printf( "Reconnecting to MPD again!\n" );
+  status = mpd_reconnect( main_data->mpd );
+  if ( status < 0 ) {
+    printf( "Reconnection failed\n" );
+    return TRUE;
+  }
   (void)g_timeout_add_seconds( 1, poll_mpd, data );
   return FALSE;
 }
@@ -155,7 +160,7 @@ gboolean poll_mpd ( gpointer data )
 
   if ( status != 0 ) {
     printf( "We lost our connection to MPD. Trying again shortly.\n" );
-    (void)g_timeout_add_seconds( 5, reconnect_mpd, data );
+    (void)g_timeout_add_seconds( 1, reconnect_mpd, data );
     return FALSE;
   }
 

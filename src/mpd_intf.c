@@ -10,13 +10,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+
 #include "glib.h"
+
 #include "mpd_intf.h"
 
 /*!
- * This is the structure which is populated by mpd_get_current method.
- * changed notes of any fields are different from the last time
- * mpd_get_current was called.
+ * This is the data extracted from the MPD command. changed is updated
+ * with MPD_CHANGED flags to note differences from the current values.
  */
 struct MPD_CURRENT {
   //! Bitmap of changed values.
@@ -34,11 +35,17 @@ struct MPD_CURRENT {
   //! Total track time in seconds.
   int total_time;
 };
-
+/*!
+ * The details of the MPD connection.
+ */
 struct MPD_PRIVATE {
+  //! The socket file descriptor.
   int fd;
+  //! Host string.
   GString* host;
+  //! "service" string (usually a port number, though).
   GString* port;
+  //! The results of the last poll of the server.
   struct MPD_CURRENT current;
 };
 
@@ -127,6 +134,9 @@ static int mpd_connect ( const char* host, const char* port )
 	printf( "Expecting \"OK MPD\", instead received \"%s\"\n", buffer );
 	close( mpd );
 	mpd = -1;
+      }
+      else {
+	printf( "Connection successful on fd: %d\n", mpd );
       }
     }
   }
@@ -402,6 +412,18 @@ struct MPD_HANDLE mpd_create ( const char* host, const char* port )
   return handle;
 }
 
+int mpd_reconnect ( struct MPD_HANDLE handle )
+{
+  if ( handle.d == NULL ) {
+    return -1;
+  }
+
+  close( handle.d->fd );
+  handle.d->fd = mpd_connect( handle.d->host->str, handle.d->port->str );
+
+  return mpd_status( handle );
+}
+
 int mpd_status ( const struct MPD_HANDLE handle )
 {
   int status = -1;
@@ -413,13 +435,15 @@ int mpd_status ( const struct MPD_HANDLE handle )
 
 void mpd_free ( struct MPD_HANDLE handle )
 {
-  if ( handle.d != 0 ) {
+  if ( handle.d != NULL ) {
     mpd_current_free( &handle.d->current );
     g_string_free( handle.d->port, TRUE );
     g_string_free( handle.d->host, TRUE );
     if ( handle.d->fd > -1 ) {
       close(  handle.d->fd );
     }
+    free( handle.d );
+    handle.d = NULL;
   }
 }
 
