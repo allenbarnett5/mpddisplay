@@ -45,6 +45,8 @@ struct MPD_PRIVATE {
   GString* host;
   //! "service" string (usually a port number, though).
   GString* port;
+  //! Query string.
+  GString* query;
   //! The results of the last poll of the server.
   struct MPD_CURRENT current;
 };
@@ -162,39 +164,18 @@ static void mpd_current_free ( struct MPD_CURRENT* current )
   g_string_free( current->title, TRUE );
 }
 
-static int mpd_get_current ( int mpd, struct MPD_CURRENT* previous )
+static int mpd_get_current ( int mpd, const GString* query,
+			     struct MPD_CURRENT* previous )
 {
   // So, this is the nub of it. Send a command to MPD and await its
   // response.
-  // \bug could compress this down into a single call to put_line...
-  // \bug construct a string with all this to begin with...
+
   int n_written;
 
-  n_written = put_line( mpd, "command_list_begin\n", 19 );
+  n_written = put_line( mpd, query->str, query->len );
 
-  if ( n_written != 19 ) {
-    printf( "Well, something went wrong with the command_list_begin. Probably lost the connection.\n" );
-    return -1;
-  }
-
-  n_written = put_line( mpd, "status\n", 7 );
-
-  if ( n_written != 7 ) {
-    printf( "Well, something went wrong with the status. Probably lost the connection.\n" );
-    return -1;
-  }
-
-  n_written = put_line( mpd, "currentsong\n", 12 );
-
-  if ( n_written != 12 ) {
-    printf( "Well, something went wrong with the currentsong. Probably lost the connection.\n" );
-    return -1;
-  }
-
-  n_written = put_line( mpd, "command_list_end\n", 17 );
-
-  if ( n_written != 17 ) {
-    printf( "Well, something went wrong with the command_list_end. Probably lost the connection.\n" );
+  if ( n_written != (int)query->len ) {
+    printf( "Well, something went wrong with the command list. Probably lost the connection.\n" );
     return -1;
   }
 
@@ -405,6 +386,12 @@ struct MPD_HANDLE mpd_create ( const char* host, const char* port )
   handle.d->host = g_string_new( host );
   handle.d->port = g_string_new( port );
 
+  handle.d->query = g_string_new( "\
+command_list_begin\n\
+status\n\
+currentsong\n\
+command_list_end\n" );
+
   mpd_current_init( &handle.d->current );
 
   handle.d->fd = mpd_connect( handle.d->host->str, handle.d->port->str );
@@ -451,7 +438,8 @@ int mpd_poll ( struct MPD_HANDLE handle )
 {
   int status = -1;
   if ( handle.d != 0 ) {
-    status = mpd_get_current( handle.d->fd, &handle.d->current );
+    status = mpd_get_current( handle.d->fd, handle.d->query,
+			      &handle.d->current );
   }
   return status;
 }
