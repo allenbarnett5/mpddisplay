@@ -12,6 +12,7 @@ have to have installed a massive number of -dev dependencies including:
 * libsqlite3-dev
 * libpango1.0-dev
 * libmagickwand-dev
+* liblog4c-dev
 * ... more to come ...
 
 (Still trying to get the hang of Git and Markdown.)
