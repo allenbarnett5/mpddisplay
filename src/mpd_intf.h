@@ -9,6 +9,7 @@
 #include <time.h>
 
 struct MPD_PRIVATE;
+struct LOG_HANDLE;
 
 struct MPD_HANDLE {
   struct MPD_PRIVATE* d;
@@ -48,9 +49,11 @@ struct MPD_TIMES {
  * \param[in] host the host name.
  * \param[in] port the port (well, really this is the "service" passed
  * to getaddrinfo()).
+ * \param[in,out] logger the handle to the logger service.
  * \return a handle to the MPD connection.
  */
-struct MPD_HANDLE mpd_create ( const char* host, const char* port );
+struct MPD_HANDLE mpd_create ( const char* host, const char* port,
+			       struct LOG_HANDLE logger );
 /*!
  * Somehow we lost our connection, so we try to connect again.
  * \param[in,out] handle MPD connection.

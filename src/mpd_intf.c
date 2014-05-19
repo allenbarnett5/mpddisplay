@@ -13,6 +13,7 @@
 
 #include "glib.h"
 
+#include "log_intf.h"
 #include "mpd_intf.h"
 
 /*!
@@ -47,6 +48,8 @@ struct MPD_PRIVATE {
   GString* port;
   //! Query string.
   GString* query;
+  //! Our logging object.
+  struct LOG_HANDLE logger;
   //! The results of the last poll of the server.
   struct MPD_CURRENT current;
 };
@@ -55,7 +58,8 @@ struct MPD_PRIVATE {
 static ssize_t read_line( int fd, void* buffer, size_t n );
 static int put_line ( int fd, void* buffer, size_t n );
 
-static int mpd_connect ( const char* host, const char* port )
+static int mpd_connect ( const char* host, const char* port,
+			 struct LOG_HANDLE logger )
 {
   int mpd = -1; // Assume the worst.
 
@@ -72,10 +76,11 @@ static int mpd_connect ( const char* host, const char* port )
   int ret = getaddrinfo( host, port, &hints, &addrs );
 
   if ( ret != 0 ) {
-    printf( "Error: getaddrinfo failed trying to look up '%s' port '%s': %s\n",
-	    host, port, gai_strerror( ret ) );
+    log_message_error( logger,
+		       "getaddrinfo failed trying to look up '%s' port '%s': %s",
+		       host, port, gai_strerror( ret ) );
     if ( ret == EAI_SYSTEM ) {
-      printf( "\tAdditionally: %s\n", strerror( errno ) );
+      log_message_error( logger, "Additionally: %s", strerror( errno ) );
     }
     return mpd;
   }
@@ -89,8 +94,9 @@ static int mpd_connect ( const char* host, const char* port )
     mpd = socket( addr->ai_family, addr->ai_socktype, addr->ai_protocol );
 
     if ( mpd == -1 ) {
-      printf( "Warning: Could not create socket for addrinfo: %s\n",
-	      strerror( errno ) );
+      log_message_warn(  logger,
+			 "Could not create socket for addrinfo: %s",
+			 strerror( errno ) );
       continue;
     }
 
@@ -99,7 +105,7 @@ static int mpd_connect ( const char* host, const char* port )
 		 addr_host, sizeof addr_host,
 		 addr_serv, sizeof addr_serv, 0 );
 
-    printf( "Info: Connecting to %s %s\n", addr_host, addr_serv );
+    log_message_info( logger, "Connecting to %s %s", addr_host, addr_serv );
 
     errno = 0;
 
@@ -107,7 +113,8 @@ static int mpd_connect ( const char* host, const char* port )
       break;
     }
     else {
-      printf( "Warning: Could not connect: %s\n", strerror( errno ) );
+      log_message_warn( logger, "Could not connect: %s",
+			strerror( errno ) );
     }
 
     close( mpd );
@@ -118,7 +125,7 @@ static int mpd_connect ( const char* host, const char* port )
   freeaddrinfo( addrs );
 
   if ( addr == NULL ) {
-    printf( "Error: Could not connect socket to any address\n" );
+    log_message_error( logger, "Could not connect socket to any address" );
   }
   else if ( mpd >= 0 ) {
     // Peek at the first line from the server. We expect it to
@@ -126,19 +133,22 @@ static int mpd_connect ( const char* host, const char* port )
     char buffer[32];
     ssize_t n = read_line( mpd, buffer, sizeof buffer );
     if ( n < 0 ) {
-      printf( "Error: Failed to hear from server: %s\n", strerror( errno ) );
+      log_message_error( logger,
+			 "Failed to hear from server: %s",
+			 strerror( errno ) );
       close( mpd );
       mpd = -1;
     }
     else {
       if ( strncmp( "OK MPD", buffer, 6 ) != 0 ) {
-	printf( "Error: Did not receive correct response from server\n" );
-	printf( "Expecting \"OK MPD\", instead received \"%s\"\n", buffer );
+	log_message_error( logger,
+			   "Did not receive correct response from server\n\
+Expecting \"OK MPD\", instead received \"%s\"", buffer );
 	close( mpd );
 	mpd = -1;
       }
       else {
-	printf( "Connection successful on fd: %d\n", mpd );
+	log_message_info( logger, "Connection successful on fd: %d", mpd );
       }
     }
   }
@@ -165,6 +175,7 @@ static void mpd_current_free ( struct MPD_CURRENT* current )
 }
 
 static int mpd_get_current ( int mpd, const GString* query,
+			     struct LOG_HANDLE logger,
 			     struct MPD_CURRENT* previous )
 {
   // So, this is the nub of it. Send a command to MPD and await its
@@ -175,7 +186,7 @@ static int mpd_get_current ( int mpd, const GString* query,
   n_written = put_line( mpd, query->str, query->len );
 
   if ( n_written != (int)query->len ) {
-    printf( "Well, something went wrong with the command list. Probably lost the connection.\n" );
+    log_message_error( logger, "Well, something went wrong with the command list. Probably lost the connection." );
     return -1;
   }
 
@@ -197,7 +208,7 @@ static int mpd_get_current ( int mpd, const GString* query,
       break;
     }
     else if ( n_read > 2 && strncmp( "ACK", buffer, 3 ) == 0 ) {
-      printf( "Error from MPD: '%s'\n", buffer );
+      log_message_error( logger, "Message from MPD: '%s'", buffer );
       break;
     }
     // The rest of this is parsing the output.
@@ -253,7 +264,7 @@ static int mpd_get_current ( int mpd, const GString* query,
   }
 
   if ( n_read == -1 ) {
-    printf( "Well, something went wrong with the read. Probably lost the connection.\n" );
+    log_message_error( logger, "Well, something went wrong with the read. Probably lost the connection." );
     mpd_current_free( &current );
     return -1;
   }
@@ -378,7 +389,8 @@ static int put_line ( int fd, void* buffer, size_t n )
   return total_written;
 }
 
-struct MPD_HANDLE mpd_create ( const char* host, const char* port )
+struct MPD_HANDLE mpd_create ( const char* host, const char* port,
+			       struct LOG_HANDLE logger )
 {
   struct MPD_HANDLE handle;
   handle.d = malloc( sizeof( struct MPD_PRIVATE ) );
@@ -392,9 +404,12 @@ status\n\
 currentsong\n\
 command_list_end\n" );
 
+  handle.d->logger = logger;
+
   mpd_current_init( &handle.d->current );
 
-  handle.d->fd = mpd_connect( handle.d->host->str, handle.d->port->str );
+  handle.d->fd = mpd_connect( handle.d->host->str, handle.d->port->str,
+			      handle.d->logger );
 
   return handle;
 }
@@ -406,7 +421,8 @@ int mpd_reconnect ( struct MPD_HANDLE handle )
   }
 
   close( handle.d->fd );
-  handle.d->fd = mpd_connect( handle.d->host->str, handle.d->port->str );
+  handle.d->fd = mpd_connect( handle.d->host->str, handle.d->port->str,
+			      handle.d->logger );
 
   return mpd_status( handle );
 }
@@ -439,7 +455,7 @@ int mpd_poll ( struct MPD_HANDLE handle )
   int status = -1;
   if ( handle.d != 0 ) {
     status = mpd_get_current( handle.d->fd, handle.d->query,
-			      &handle.d->current );
+			      handle.d->logger, &handle.d->current );
   }
   return status;
 }

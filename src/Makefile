@@ -12,12 +12,12 @@ CFLAGS = -g -Wall -Wextra -MMD \
 -I /usr/include/ImageMagick
 
 mpddisplay: main.o mpd_intf.o display_intf.o text_widget.o \
-magick_image.o cover_image.o no_cover.o image_widget.o pattern.o
+magick_image.o cover_image.o no_cover.o image_widget.o pattern.o log_intf.o
 	gcc -o mpddisplay main.o mpd_intf.o display_intf.o \
 text_widget.o magick_image.o cover_image.o no_cover.o image_widget.o \
-pattern.o \
+pattern.o log_intf.o \
 -L /opt/vc/lib -lGLESv2  -lpangoft2-1.0 -lpango-1.0 -lfreetype -lglib-2.0 \
--lMagickWand -lsqlite3
+-lMagickWand -lsqlite3 -llog4c
 
 no_cover.o: no_cover.png
 	$(OBJCOPY) --input-target=binary --output-target=$(BFDNAME) \
@@ -30,5 +30,5 @@ pattern.o: pattern.png
 clean:
 	rm -f *.o mpddisplay
 
--include main.d mpd_intf.d display_intf.d vg_font.d text_widget.d \
-magick_image.d cover_image.d image_widget.d
+-include main.d mpd_intf.d display_intf.d text_widget.d \
+magick_image.d cover_image.d image_widget.d log_intf.d

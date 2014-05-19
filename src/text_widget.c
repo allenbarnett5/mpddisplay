@@ -358,6 +358,7 @@ static void convert_outline ( const FT_Vector *points,
 			      const short *contours,
 			      short contours_count, short points_count )
 {
+  (void)points_count; // \bug unused, but it should be.
    segments_count = 0;
    coords_count = 0;
 

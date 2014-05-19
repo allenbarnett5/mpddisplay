@@ -15,6 +15,7 @@
 
 #include "mpd_intf.h"
 #include "display_intf.h"
+#include "log_intf.h"
 
 static int convert_int ( const char* string );
 
@@ -25,6 +26,7 @@ const char* USAGE = "usage: %s [--host hostname] [--port port#]\n";
 
 struct MAIN_DATA {
   struct MPD_HANDLE mpd;
+  struct LOG_HANDLE logger;
   GMainLoop* loop;
 } main_data;
 
@@ -35,6 +37,10 @@ int main ( int argc, char* argv[] )
   char* host = "guanaco"; // Well, that's mine. Maybe this should be localhost.
   char* port = "6600";    // The standard MPD port.
   bool bad_argument = false;
+  struct LOG_HANDLE logger;
+
+  // Start the logger.
+  main_data.logger = log_init();
 
   while ( 1 ) {
     int option_index = 0;
@@ -83,10 +89,10 @@ int main ( int argc, char* argv[] )
     return 1;
   }
 
-  printf( "MPD host: '%s'\n", host );
-  printf( "MPD port: '%s'\n", port );
+  log_message_info( main_data.logger, "MPD host: '%s'", host );
+  log_message_info( main_data.logger, "MPD port: '%s'", port );
 
-  main_data.mpd = mpd_create( host, port );
+  main_data.mpd = mpd_create( host, port, main_data.logger );
 
   if ( mpd_status( main_data.mpd ) < 0 ) {
     printf( USAGE, argv[0] );
@@ -115,6 +121,8 @@ int main ( int argc, char* argv[] )
 
   mpd_free( main_data.mpd );
 
+  log_close( logger );
+
   return 0;
 }
 
@@ -142,10 +150,12 @@ gboolean reconnect_mpd ( gpointer data )
 {
   struct MAIN_DATA* main_data = data;
   int status;
-  printf( "Reconnecting to MPD again!\n" );
+  log_message_warn( main_data->logger, "Reconnecting to MPD again!" );
+
   status = mpd_reconnect( main_data->mpd );
+
   if ( status < 0 ) {
-    printf( "Reconnection failed\n" );
+    log_message_error( main_data->logger, "Reconnection failed" );
     return TRUE;
   }
   (void)g_timeout_add_seconds( 1, poll_mpd, data );
@@ -159,7 +169,8 @@ gboolean poll_mpd ( gpointer data )
   int status = mpd_poll( main_data->mpd );
 
   if ( status != 0 ) {
-    printf( "We lost our connection to MPD. Trying again shortly.\n" );
+    log_message_warn( main_data->logger,
+		      "We lost our connection to MPD. Trying again shortly." );
     (void)g_timeout_add_seconds( 1, reconnect_mpd, data );
     return FALSE;
   }

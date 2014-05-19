@@ -1,0 +1,5 @@
+<log4c>
+<category name="mpddisplay" priority="debug" appender="stdout" />
+<appender name="stdout" type="stream" layout="dated" />
+<layout name="dated" type="dated" />
+</log4c>
