@@ -73,11 +73,15 @@ static const VGfloat dpmm_y = 461./53.975; // vc_frame_height / tv_height;
 static const VGfloat background[] = { 0.f, 0.f, 0.f, 1.f };
 
 // The size of border decoration in mm.
-static const VGfloat border_thickness = 2.f;
+static const VGfloat border_thickness = 1.f;
+// Round size (mm).
+static const VGfloat round_radius = 4.f;
 // Fraction of the screen to devote to the text box.
 static const VGfloat text_scale = 0.5f;
 // Space between the border and the text (units?)
 static const VGfloat text_gutter = 1.f;
+// Thermometer gap (mm).
+static const VGfloat thermometer_gap = 0.5f;
 
 // The basic height of the font in mm.
 static const VGfloat font_size_mm = 3.f;
@@ -349,17 +353,29 @@ int display_init ( void )
   vguRect( frame_path, 0.f, 0.f, tv_width, tv_height );
 
   // Text box.
-  vguRect( frame_path, border_thickness, border_thickness,
-	   tv_width / 2.f - border_thickness / 2.f,
-	   tv_height - 2.f * border_thickness );
+  vguRoundRect( frame_path,
+	   border_thickness,
+	   border_thickness,
+	   tv_width / 2.f - 1.5f * border_thickness,
+	   tv_height - 2.f * border_thickness,
+	   round_radius, round_radius );
 
-  // Time box.
-  vguRoundRect( frame_path, 
-		tv_width / 2.f + border_thickness,
-		border_thickness,
-		( tv_width / 2.f - 2.f * border_thickness ) / 1.f,
-		2.f * border_thickness,
-		2.f * border_thickness, 2.f * border_thickness );
+  // Image box.
+  float image_edge = tv_width / 2.f - 1.5 * border_thickness;
+  vguRoundRect( frame_path,
+	   tv_width / 2.f + border_thickness / 2.f,
+	   tv_height - border_thickness - image_edge,
+	   image_edge,
+	   image_edge,
+	   round_radius, round_radius
+	   );
+  float time_height = tv_height - border_thickness - image_edge - border_thickness - border_thickness;
+  vguRoundRect( frame_path,
+	   tv_width / 2.f + border_thickness / 2.f,
+	   border_thickness,
+	   image_edge,
+	   time_height,
+	   round_radius, round_radius );
 
   vgSetPaint( frame_paint, VG_FILL_PATH );
 
@@ -379,8 +395,8 @@ int display_init ( void )
   vgLoadIdentity();
 
   vgSetParameteri( thermometer_paint, VG_PAINT_TYPE, VG_PAINT_TYPE_LINEAR_GRADIENT );
-  VGfloat gradient_points[] = { 0.f,       border_thickness,
-				0.f, 3.f * border_thickness };
+  VGfloat gradient_points[] = { 0.f, border_thickness,
+				0.f, border_thickness + time_height };
   vgSetParameterfv( thermometer_paint, VG_PAINT_LINEAR_GRADIENT,
 		    4, gradient_points );
   float fill_stops[] = {
@@ -391,7 +407,7 @@ int display_init ( void )
   };
   vgSetParameterfv( thermometer_paint, VG_PAINT_COLOR_RAMP_STOPS,
 		    4 * 5, fill_stops );
-
+#if 1
   // \bug need to think more deeply about what the right description
   // of the text box should be passed to the widget. The font cares
   // about the screen DPI, but (I think) the layout is done on the
@@ -411,19 +427,18 @@ int display_init ( void )
 				  vc_frame_width/2.f - 2.f*border_thickness * dpmm_y, 30.f );
 
   text_widget_set_alignment( time_widget, TEXT_WIDGET_ALIGN_CENTER );
-
+#endif
   // The cover widget. Where is it going to go? Need to specify
   // the width and height carefully so that the aspect ratio is
   // correct.
-  float iw_x_pix = vc_frame_width/2.f + 2.f * border_thickness * dpmm_x;
-  float iw_y_pix = vc_frame_height-border_thickness * dpmm_y;
-  float iw_width_mm = tv_width / 2.f - 2.f * border_thickness;
+  float iw_x_mm = tv_width / 2.f + border_thickness / 2.f;
+  float iw_y_mm = tv_height - border_thickness - image_edge;
+  float iw_width_mm = image_edge;
   float iw_height_mm = iw_width_mm;
-  float iw_width_pix = iw_width_mm * dpmm_x;
-  float iw_height_pix = iw_height_mm * dpmm_y;
-  cover_widget = image_widget_init( iw_x_pix, iw_y_pix,
+
+  cover_widget = image_widget_init( iw_x_mm, iw_y_mm,
 				    iw_width_mm, iw_height_mm,
-				    iw_width_pix, iw_height_pix );
+				    dpmm_x, dpmm_y );
 
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
 
@@ -452,8 +467,6 @@ int display_update ( const struct MPD_HANDLE handle )
   vgDrawPath( background_path, VG_FILL_PATH );
 
   vgPaintPattern( frame_paint, fg_brush );
-
-  vgDrawPath( frame_path, VG_FILL_PATH );
 
   if ( mpd_changed( handle,
 		    MPD_CHANGED_ARTIST | MPD_CHANGED_ALBUM | MPD_CHANGED_TITLE ) ) {
@@ -490,30 +503,34 @@ int display_update ( const struct MPD_HANDLE handle )
     vgClearPath( thermometer_path, VG_PATH_CAPABILITY_ALL );
 
     if ( times.total > 0 ) {
+      float image_edge = tv_width / 2.f - 1.5 * border_thickness;
+      float time_height = tv_height - border_thickness - image_edge - border_thickness - border_thickness - 2.f * thermometer_gap;
+
       VGfloat thermometer_width =
 	(float)times.elapsed / (float)times.total *
-	( tv_width / 2.f - 2.f * border_thickness - 0.2f * border_thickness );
+	( tv_width / 2.f - 1.5f * border_thickness - 2.f * thermometer_gap );
+
 
       vguRoundRect( thermometer_path, 
-		    tv_width / 2.f + 1.1 * border_thickness,
-		    border_thickness,
+		    tv_width / 2.f + border_thickness / 2.f + thermometer_gap,
+		    border_thickness + thermometer_gap,
 		    thermometer_width,
-		    2.f * border_thickness,
-		    2.f * border_thickness, 2.f * border_thickness );
+		    time_height,
+		    round_radius, round_radius );
     }
   }
 
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
   vgLoadIdentity();
-
+#if 1
   vgSetPaint( thermometer_paint, VG_FILL_PATH );
-
+#endif
   vgDrawPath( thermometer_path, VG_FILL_PATH );
-
+#if 1
   text_widget_draw_text( metadata_widget );
 
   text_widget_draw_text( time_widget );
-
+#endif
   if ( mpd_changed( handle, MPD_CHANGED_ALBUM ) ) {
     struct IMAGE_HANDLE cover_image_handle =
       cover_image( mpd_artist( handle ), mpd_album( handle ) );
@@ -521,6 +538,14 @@ int display_update ( const struct MPD_HANDLE handle )
   }
 
   image_widget_draw_image( cover_widget );
+
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
+  vgLoadIdentity();
+  vgScale( 0.1, 0.1 );
+
+  vgSetPaint( frame_paint, VG_FILL_PATH );
+
+  vgDrawPath( frame_path, VG_FILL_PATH );
 
   EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
 

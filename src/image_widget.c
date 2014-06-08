@@ -9,12 +9,12 @@
 #include "image_widget.h"
 
 struct IMAGE_WIDGET_PRIVATE {
-  float x;
-  float y;
+  float x_mm;
+  float y_mm;
   float width_mm;
   float height_mm;
-  int width_pixels;
-  int height_pixels;
+  float dpmm_x;
+  float dpmm_y;
   int image_width;
   int image_height;
   float scale_x;
@@ -22,20 +22,20 @@ struct IMAGE_WIDGET_PRIVATE {
   VGImage image;
 };
 
-struct IMAGE_WIDGET_HANDLE image_widget_init ( float x, float y,
+struct IMAGE_WIDGET_HANDLE image_widget_init ( float x_mm, float y_mm,
 					       float width_mm,
 					       float height_mm,
-					       int width_pixels,
-					       int height_pixels )
+					       float dpmm_x,
+					       float dpmm_y )
 {
   struct IMAGE_WIDGET_HANDLE handle;
   handle.d = malloc( sizeof( struct IMAGE_WIDGET_PRIVATE ) );
-  handle.d->x = x;
-  handle.d->y = y;
+  handle.d->x_mm = x_mm;
+  handle.d->y_mm = y_mm;
   handle.d->width_mm = width_mm;
   handle.d->height_mm = height_mm;
-  handle.d->width_pixels = width_pixels;
-  handle.d->height_pixels = height_pixels;
+  handle.d->dpmm_x = dpmm_x;
+  handle.d->dpmm_y = dpmm_y;
   return handle;
 }
 
@@ -81,8 +81,8 @@ void image_widget_set_image ( struct IMAGE_WIDGET_HANDLE handle,
 
   vgDestroyImage( base );
 
-  handle.d->scale_x = (float)handle.d->width_pixels/handle.d->image_width;
-  handle.d->scale_y = -(float)handle.d->height_pixels/handle.d->image_height;
+  handle.d->scale_x = handle.d->width_mm  / handle.d->image_width;
+  handle.d->scale_y = handle.d->height_mm / handle.d->image_height;
 }
 
 void image_widget_draw_image ( struct IMAGE_WIDGET_HANDLE handle )
@@ -91,7 +91,17 @@ void image_widget_draw_image ( struct IMAGE_WIDGET_HANDLE handle )
     return;
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_IMAGE_USER_TO_SURFACE );
   vgLoadIdentity();
-  vgTranslate( handle.d->x, handle.d->y );
-  vgScale( handle.d->scale_x, handle.d->scale_y );
+  // Overscan.
+  vgTranslate( 14.f, 8.f );
+  // Values in mm all around.
+  vgScale( handle.d->dpmm_x, handle.d->dpmm_y );
+  // Move to the corner.
+  vgTranslate( handle.d->x_mm, handle.d->y_mm );
+  // And we bascially draw the image upside down, so we really start
+  // drawing at the upper left corner.
+  vgTranslate( 0.f, handle.d->height_mm );
+  // Scale the image to mm.
+  vgScale( handle.d->scale_x, -handle.d->scale_y );
+
   vgDrawImage( handle.d->image );
 }

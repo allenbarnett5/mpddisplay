@@ -14,12 +14,18 @@ struct IMAGE_WIDGET_HANDLE {
 
 /*!
  * Create an image widget.
+ * \param[in] x_mm position of the left edge in mm.
+ * \param[in] y_mm position of the bottom edge in mm.
+ * \param[in] width_mm width of the window in mm.
+ * \param[in] height_mm height of the window in mm.
+ * \param[in] dpmm_x dots per mm in x direction.
+ * \param[in] dpmm_y dots per mm in y direction.
  */
-struct IMAGE_WIDGET_HANDLE image_widget_init ( float x, float y,
+struct IMAGE_WIDGET_HANDLE image_widget_init ( float x_mm, float y_mm,
 					       float width_mm,
 					       float height_mm,
-					       int width_pixels,
-					       int height_pixels );
+					       float dpmm_x,
+					       float dpmm_y );
 
 /*!
  * Replace the image.
