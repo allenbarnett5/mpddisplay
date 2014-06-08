@@ -23,16 +23,18 @@ enum TEXT_WIDGET_ALIGNMENT {
  * font and character size? Well, they're just going to be overriden
  * by the markup. Furthermore, it appears that Pango/FreeType has
  * some kind of default, probably provided by fontconfig.
- * \param[in] width_mm
- * \param[in] height_mm
- * \param[in] width_pixels
- * \param[in] height_pixels
+ * \param[in] x_mm x position in mm.
+ * \param[in] y_mm y position in mm.
+ * \param[in] width_mm width in mm.
+ * \param[in] height_mm height in mm.
+ * \param[in] dpmm_x dots per mm in the x direction.
+ * \param[in] dpmm_y dots per mm in the y direction.
  */
-struct TEXT_WIDGET_HANDLE text_widget_init ( int x, int y,
+struct TEXT_WIDGET_HANDLE text_widget_init ( float x_mm, float y_mm,
 					     float width_mm,
 					     float height_mm,
-					     int width_pixels,
-					     int height_pixels );
+					     float dpmm_x,
+					     float dpmm_y );
 
 /*!
  * Set the text alignment.

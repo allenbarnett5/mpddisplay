@@ -45,8 +45,10 @@ void vg_data_free ( void* vg_data_ptr )
 static void add_char ( VGFont font, FT_Face face, FT_ULong c );
 
 struct TEXT_WIDGET_PRIVATE {
-  int x;
-  int y;
+  float x_mm;
+  float y_mm;
+  float dpmm_x;
+  float dpmm_y;
   PangoFontMap* font_map;
   PangoContext* context;
   PangoLayout* layout;
@@ -55,29 +57,33 @@ struct TEXT_WIDGET_PRIVATE {
 
 static VGfloat DEFAULT_FOREGROUND[] = { 1.f, 1.f, 1.f, 1.f };
 
-struct TEXT_WIDGET_HANDLE text_widget_init ( int x, int y,
+struct TEXT_WIDGET_HANDLE text_widget_init ( float x_mm, float y_mm,
 					     float width_mm,
 					     float height_mm,
-					     int width_pixels,
-					     int height_pixels )
+					     float dpmm_x,
+					     float dpmm_y )
 {
   struct TEXT_WIDGET_HANDLE handle;
   handle.d = malloc( sizeof( struct TEXT_WIDGET_PRIVATE ) );
-  handle.d->x = x;
-  handle.d->y = y;
+  handle.d->x_mm = x_mm;
+  handle.d->y_mm = y_mm;
+  handle.d->dpmm_x = dpmm_x;
+  handle.d->dpmm_y = dpmm_y;
   handle.d->font_map = pango_ft2_font_map_new();
 
+  // Note: FreeType works in DPI.
   pango_ft2_font_map_set_resolution( (PangoFT2FontMap*)handle.d->font_map,
-			     width_pixels / ( (double)width_mm / 25.4 ),
-			     height_pixels / ( (double)height_mm / 25.4 ) );
+				     dpmm_x * 25.4, dpmm_y * 25.4 );
 
   handle.d->context  = pango_font_map_create_context( handle.d->font_map );
   handle.d->layout   = pango_layout_new( handle.d->context );
 
-  pango_layout_set_width( handle.d->layout,
-			  pango_units_from_double( width_pixels ) );
-  pango_layout_set_height( handle.d->layout,
-			   pango_units_from_double( height_pixels ) );
+  // Pango works in Pango Units. Not exactly clear how the resolution of
+  // the font and the size of the rendering box fit together.
+  int width = pango_units_from_double( dpmm_x * width_mm );
+  int height = pango_units_from_double( dpmm_y * height_mm );
+  pango_layout_set_width( handle.d->layout, width );
+  pango_layout_set_height( handle.d->layout, height );
 
   handle.d->foreground = vgCreatePaint();
   vgSetParameterfv( handle.d->foreground, VG_PAINT_COLOR, 4, DEFAULT_FOREGROUND );
@@ -163,9 +169,15 @@ void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
   vgSetPaint( handle.d->foreground, VG_FILL_PATH );
 
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
-
   vgLoadIdentity();
-  vgTranslate( handle.d->x, handle.d->y );
+  // Overscan (in dots, evidently).
+  vgTranslate( 14.f, 8.f );
+  // Offset in mm.
+  vgScale( handle.d->dpmm_x, handle.d->dpmm_y );
+  // Move to the corner.
+  vgTranslate( handle.d->x_mm, handle.d->y_mm );
+  // Back to dots.
+  vgScale( 1.f/handle.d->dpmm_x, 1.f/handle.d->dpmm_y );
 
   int height = PANGO_PIXELS( pango_layout_get_height( handle.d->layout ) );
 

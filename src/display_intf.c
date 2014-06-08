@@ -352,7 +352,7 @@ int display_init ( void )
 
   vguRect( frame_path, 0.f, 0.f, tv_width, tv_height );
 
-  // Text box.
+  // Metadata box.
   vguRoundRect( frame_path,
 	   border_thickness,
 	   border_thickness,
@@ -369,6 +369,8 @@ int display_init ( void )
 	   image_edge,
 	   round_radius, round_radius
 	   );
+
+  // Thermometer box.
   float time_height = tv_height - border_thickness - image_edge - border_thickness - border_thickness;
   vguRoundRect( frame_path,
 	   tv_width / 2.f + border_thickness / 2.f,
@@ -407,27 +409,22 @@ int display_init ( void )
   };
   vgSetParameterfv( thermometer_paint, VG_PAINT_COLOR_RAMP_STOPS,
 		    4 * 5, fill_stops );
-#if 1
-  // \bug need to think more deeply about what the right description
-  // of the text box should be passed to the widget. The font cares
-  // about the screen DPI, but (I think) the layout is done on the
-  // basis of pixels.
-  metadata_widget = text_widget_init( vc_frame_x + border_thickness * dpmm_x
-				      + text_gutter,
-				      -border_thickness * dpmm_y,
-				      tv_width/2.f, tv_height,
-				      vc_frame_width/2.f, vc_frame_height );
 
-  // Not sure what the parameters of this should be. A height of 35.f
-  // looks ok for now, but really depends on the font.
-  time_widget = text_widget_init( vc_frame_x + border_thickness * dpmm_x
-				  + text_gutter + vc_frame_width/2.,
-				  vc_frame_y + border_thickness * dpmm_y,
-				  tv_width/2.f, tv_height,
-				  vc_frame_width/2.f - 2.f*border_thickness * dpmm_y, 30.f );
+  metadata_widget =
+    text_widget_init( border_thickness, border_thickness,
+		      tv_width / 2.f - 1.5f * border_thickness,
+		      tv_height - 2.f * border_thickness,
+		      dpmm_x, dpmm_y );
+
+  // \bug widget height is a judgement text_widget should really
+  // have a vertical centering option.
+  time_widget = text_widget_init( tv_width / 2.f + border_thickness / 2.f,
+				  border_thickness,
+				  image_edge, time_height - border_thickness,
+				  dpmm_x, dpmm_y );
 
   text_widget_set_alignment( time_widget, TEXT_WIDGET_ALIGN_CENTER );
-#endif
+
   // The cover widget. Where is it going to go? Need to specify
   // the width and height carefully so that the aspect ratio is
   // correct.
@@ -471,7 +468,7 @@ int display_update ( const struct MPD_HANDLE handle )
   if ( mpd_changed( handle,
 		    MPD_CHANGED_ARTIST | MPD_CHANGED_ALBUM | MPD_CHANGED_TITLE ) ) {
     char* buffer =
-      g_markup_printf_escaped( "<span font=\"Droid Sans 26px\">%s\n<i>%s</i>\n<b>%s</b></span>",
+      g_markup_printf_escaped( "<span font=\"Droid Sans 24px\">%s\n<i>%s</i>\n<b>%s</b></span>",
 			       mpd_artist( handle ),
 			       mpd_album( handle ),
 			       mpd_title( handle ) );
@@ -488,7 +485,7 @@ int display_update ( const struct MPD_HANDLE handle )
   if ( mpd_changed( handle,
 		    MPD_CHANGED_ELAPSED | MPD_CHANGED_TOTAL ) ) {
     char* buffer =
-      g_markup_printf_escaped( "<span font=\"Droid Sans 26px\">%02ld:%02ld / %02ld:%02ld</span>",
+      g_markup_printf_escaped( "<span font=\"Droid Sans 24px\">%02ld:%02ld / %02ld:%02ld</span>",
 			       times.elapsed / 60,
 			       times.elapsed % 60,
 			       times.total / 60,
@@ -522,15 +519,14 @@ int display_update ( const struct MPD_HANDLE handle )
 
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
   vgLoadIdentity();
-#if 1
+
   vgSetPaint( thermometer_paint, VG_FILL_PATH );
-#endif
   vgDrawPath( thermometer_path, VG_FILL_PATH );
-#if 1
+
   text_widget_draw_text( metadata_widget );
 
   text_widget_draw_text( time_widget );
-#endif
+
   if ( mpd_changed( handle, MPD_CHANGED_ALBUM ) ) {
     struct IMAGE_HANDLE cover_image_handle =
       cover_image( mpd_artist( handle ), mpd_album( handle ) );
