@@ -93,8 +93,14 @@ static struct TEXT_WIDGET_HANDLE time_widget;
 // The album cover widget.
 static struct IMAGE_WIDGET_HANDLE cover_widget;
 
-int display_init ( void )
+// The path to the database (but will probably eventually be
+// yet another handle).
+struct IMAGE_DB_HANDLE image_db;
+
+int display_init ( struct IMAGE_DB_HANDLE handle )
 {
+  image_db = handle;
+
   // There is a lot which can go wrong here. But evidently this can't
   // fail!
   bcm_host_init();
@@ -529,7 +535,7 @@ int display_update ( const struct MPD_HANDLE handle )
 
   if ( mpd_changed( handle, MPD_CHANGED_ALBUM ) ) {
     struct IMAGE_HANDLE cover_image_handle =
-      cover_image( mpd_artist( handle ), mpd_album( handle ) );
+      cover_image( image_db, mpd_artist( handle ), mpd_album( handle ) );
     image_widget_set_image( cover_widget, cover_image_handle );
   }
 
@@ -556,6 +562,8 @@ int display_update ( const struct MPD_HANDLE handle )
 int display_close ( void )
 {
   eglTerminate( egl_display );
+
+  image_db_free( image_db );
 
   return 0;
 }

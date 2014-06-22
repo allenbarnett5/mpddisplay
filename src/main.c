@@ -16,17 +16,19 @@
 #include "mpd_intf.h"
 #include "display_intf.h"
 #include "log_intf.h"
+#include "cover_image.h"
 
 static int convert_int ( const char* string );
 
 static gboolean poll_mpd ( gpointer data );
 static gboolean reconnect_mpd ( gpointer data );
 
-const char* USAGE = "usage: %s [--host hostname] [--port port#]\n";
+const char* USAGE = "usage: %s [--host hostname] [--port port#] [--database databse]\n";
 
 struct MAIN_DATA {
   struct MPD_HANDLE mpd;
   struct LOG_HANDLE logger;
+  struct IMAGE_DB_HANDLE image_db;
   GMainLoop* loop;
 } main_data;
 
@@ -36,8 +38,8 @@ int main ( int argc, char* argv[] )
   int c;
   char* host = "guanaco"; // Well, that's mine. Maybe this should be localhost.
   char* port = "6600";    // The standard MPD port.
+  char* database = "album_art.sqlite3";
   bool bad_argument = false;
-  struct LOG_HANDLE logger;
 
   // Start the logger.
   main_data.logger = log_init();
@@ -47,10 +49,11 @@ int main ( int argc, char* argv[] )
     static struct option long_options[] = {
       { "host", required_argument, 0, 'h' },
       { "port", required_argument, 0, 'p' },
+      { "database", required_argument, 0, 'd' },
       { 0,      0,                 0, 0 }
     };
 
-    c = getopt_long( argc, argv, "h:p:", long_options, &option_index );
+    c = getopt_long( argc, argv, "h:p:d:", long_options, &option_index );
 
     if ( c == -1 ) {
       break;
@@ -79,6 +82,13 @@ int main ( int argc, char* argv[] )
 	}
       }
       break;
+    case 'd':
+      if ( *optarg == '\0' ) {
+	bad_argument = true;
+	printf( "--database argument must be non-empty\n" );
+      }
+      database = optarg;
+      break;
     default:
       bad_argument = true;
       printf( "?? getopt returned character code 0%o ??\n", c );
@@ -91,6 +101,7 @@ int main ( int argc, char* argv[] )
 
   log_message_info( main_data.logger, "MPD host: '%s'", host );
   log_message_info( main_data.logger, "MPD port: '%s'", port );
+  log_message_info( main_data.logger, "Database: '%s'", database );
 
   main_data.mpd = mpd_create( host, port, main_data.logger );
 
@@ -99,9 +110,13 @@ int main ( int argc, char* argv[] )
     return 1;
   }
 
+  // Try to open the image database connection.
+
+  main_data.image_db = image_db_create( database, main_data.logger );
+
   // If we get this far, we can try to initialize the graphics.
 
-  int ret = display_init();
+  int ret = display_init( main_data.image_db );
 
   if ( ret == -1 ) {
     return 1;
@@ -121,7 +136,7 @@ int main ( int argc, char* argv[] )
 
   mpd_free( main_data.mpd );
 
-  log_close( logger );
+  log_close( main_data.logger );
 
   return 0;
 }
