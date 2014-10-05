@@ -7,8 +7,6 @@
 #include "pango/pangoft2.h"
 #include "VG/openvg.h"
 
-#include "glib.h"
-
 #include "text_widget.h"
 
 static float float_from_26_6( FT_Pos x )
@@ -39,7 +37,10 @@ struct VG_DATA* vg_data_new ( void )
 
 void vg_data_free ( void* vg_data_ptr )
 {
-  vgDestroyFont( ((struct VG_DATA*)vg_data_ptr)->font );
+  if ( vg_data_ptr != NULL ) {
+    vgDestroyFont( ((struct VG_DATA*)vg_data_ptr)->font );
+    free( vg_data_ptr );
+  }
 }
 
 static void add_char ( VGFont font, FT_Face face, FT_ULong c );

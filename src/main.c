@@ -11,8 +11,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "mcheck.h"
-
 #include "glib.h"
 
 #include "mpd_intf.h"
@@ -45,8 +43,6 @@ int main ( int argc, char* argv[] )
   char* port = "6600";    // The standard MPD port.
   char* database = "album_art.sqlite3";
   bool bad_argument = false;
-
-  mtrace();
 
   // Start the logger.
   main_data.logger = log_init();

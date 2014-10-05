@@ -69,6 +69,7 @@ int log_close ( struct LOG_HANDLE handle )
     if ( log4c_fini() ) {
     }
     free( handle.d );
+    handle.d = NULL;
   }
   return 0;
 }
