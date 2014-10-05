@@ -11,6 +11,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "mcheck.h"
+
 #include "glib.h"
 
 #include "mpd_intf.h"
@@ -23,9 +25,12 @@ static int convert_int ( const char* string );
 static gboolean poll_mpd ( gpointer data );
 static gboolean reconnect_mpd ( gpointer data );
 
+static void add_pibrella_button ( gpointer data );
+
 const char* USAGE = "usage: %s [--host hostname] [--port port#] [--database databse]\n";
 
 struct MAIN_DATA {
+  struct DISPLAY_HANDLE display;
   struct MPD_HANDLE mpd;
   struct LOG_HANDLE logger;
   struct IMAGE_DB_HANDLE image_db;
@@ -40,6 +45,8 @@ int main ( int argc, char* argv[] )
   char* port = "6600";    // The standard MPD port.
   char* database = "album_art.sqlite3";
   bool bad_argument = false;
+
+  mtrace();
 
   // Start the logger.
   main_data.logger = log_init();
@@ -116,9 +123,9 @@ int main ( int argc, char* argv[] )
 
   // If we get this far, we can try to initialize the graphics.
 
-  int ret = display_init( main_data.image_db );
+  main_data.display = display_init( main_data.image_db, main_data.mpd );
 
-  if ( ret == -1 ) {
+  if ( display_status( main_data.display ) < 0 ) {
     return 1;
   }
 
@@ -126,13 +133,20 @@ int main ( int argc, char* argv[] )
 
   main_data.loop = g_main_loop_new( NULL, FALSE );
 
+  // Poll MPD periodically.
   (void)g_timeout_add_seconds( 1, poll_mpd, &main_data );
+
+  // Also try to poll the button on the Pibrella (if it is configured
+  // properly).
+  add_pibrella_button( &main_data );
 
   g_main_loop_run( main_data.loop );
 
+  log_message_info( main_data.logger, "Done with main loop. Cleaning up." );
+
   g_main_loop_unref( main_data.loop );
 
-  display_close();
+  display_close( main_data.display );
 
   mpd_free( main_data.mpd );
 
@@ -191,9 +205,88 @@ gboolean poll_mpd ( gpointer data )
   }
 
   if ( mpd_changed( main_data->mpd, MPD_CHANGED_ANY ) ) {
-    if ( display_update( main_data->mpd ) < 0 ) {
+    display_update( main_data->display );
+    // \bug maybe check for error...
+  }
+
+  return TRUE;
+}
+
+gboolean button_callback ( GIOChannel* gio,
+			   GIOCondition condition,
+			   gpointer data )
+{
+  // Don't bother with anything if it's not the interrupt.
+  if ( condition != G_IO_PRI ) {
+    return TRUE;
+  }
+
+  struct LOG_HANDLE logger = ((struct MAIN_DATA*)data)->logger;
+  GIOStatus status;
+  gchar byte;
+  gsize bytes_read;
+  GError* err = NULL;
+
+  log_message_info( logger, "Called the button callback" );
+
+  status = g_io_channel_seek_position( gio, 0, G_SEEK_SET, &err );
+
+  if ( status == G_IO_STATUS_ERROR ) {
+    log_message_warn( logger, "Error seeking button: %s", err->message );
+    return TRUE;
+  }
+
+  // OK. But the button really needs to be debounced...
+
+  status = g_io_channel_read_chars( gio, &byte, 1, &bytes_read, &err );
+
+  if ( status == G_IO_STATUS_ERROR ) {
+    log_message_warn( logger, "Error reading button: %s", err->message );
+  }
+  else if ( bytes_read == 0 ) {
+    log_message_warn( logger, "Read button OK but no data" );
+  }
+  else {
+    if ( byte == '1' ) {
+#if 0
+      struct MPD_HANDLE mpd = ((struct MAIN_DATA*)data)->mpd;
+      mpd_play_pause( mpd );
+#else
+      // For now, use the button to exit!
+      log_message_warn( logger, "Button: Exiting main loop" );
+      g_main_loop_quit( ((struct MAIN_DATA*)data)->loop );
+#endif
     }
   }
 
   return TRUE;
+}
+
+void add_pibrella_button ( gpointer data )
+{
+  struct MAIN_DATA* main_data = data;
+  struct LOG_HANDLE logger = main_data->logger;
+
+  GIOChannel* button;
+  GError* err = NULL;
+
+  guint ret;
+  char* gpio_file = "/sys/class/gpio/gpio11/value";
+
+  // Well, it goes without saying that the GPIO pin should be an
+  // argument to the program.
+  button = g_io_channel_new_file( gpio_file, "r", &err );
+
+  if ( ! button ) {
+    log_message_warn( logger, "Could not open GPIO file \"%s\": %s",
+		      gpio_file, err->message );
+    return;
+  }
+
+  ret = g_io_add_watch( button, G_IO_PRI, button_callback, data );
+
+  if ( ! ret ) {
+    log_message_warn( logger, "Error creating watch on button" );
+    return;
+  }
 }

@@ -102,4 +102,8 @@ char* mpd_title ( const struct MPD_HANDLE handle );
  * \return the time attributes of the current song.
  */
 struct MPD_TIMES mpd_times ( const struct MPD_HANDLE handle );
+/*!
+ * Toggle the playing / paused state.
+ */
+void mpd_play_pause ( struct MPD_HANDLE handle );
 #endif

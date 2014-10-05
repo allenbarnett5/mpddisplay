@@ -505,3 +505,12 @@ struct MPD_TIMES mpd_times ( const struct MPD_HANDLE handle )
   }
   return times;
 }
+
+void mpd_play_pause ( struct MPD_HANDLE handle )
+{
+  if ( handle.d != 0 ) {
+    GString* command = g_string_new( "" );
+    put_line( handle.d->fd, command->str, command->len );
+    g_string_free( command, TRUE );
+  }
+}

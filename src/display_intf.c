@@ -21,13 +21,6 @@
 
 static const char* egl_carp ( void );
 
-// \bug better if the main program is handed some object to hold
-// this state. Although technically we can ask EGL about these
-// objects through the API.
-static EGLDisplay egl_display = EGL_NO_DISPLAY;
-static EGLSurface egl_surface = EGL_NO_SURFACE;
-// This must persist.
-static EGL_DISPMANX_WINDOW_T native_window;
 static int window_width = 0;
 static int window_height = 0;
 // The basic decoration.
@@ -86,20 +79,33 @@ static const VGfloat thermometer_gap = 0.5f;
 // The basic height of the font in mm.
 static const VGfloat font_size_mm = 3.f;
 
-// Our metadata widget.
-static struct TEXT_WIDGET_HANDLE metadata_widget;
-// Our time widget.
-static struct TEXT_WIDGET_HANDLE time_widget;
-// The album cover widget.
-static struct IMAGE_WIDGET_HANDLE cover_widget;
+struct DISPLAY_PRIVATE {
+  int status;
+  struct IMAGE_DB_HANDLE image_db;
+  struct MPD_HANDLE mpd;
+  EGLDisplay egl_display;
+  EGLSurface egl_surface;
+  // This must persist or the process segfaults and/or the system hangs!
+  EGL_DISPMANX_WINDOW_T native_window;
+  // Our metadata widget.
+  struct TEXT_WIDGET_HANDLE metadata_widget;
+  // Our time widget.
+  struct TEXT_WIDGET_HANDLE time_widget;
+  // The album cover widget.
+  struct IMAGE_WIDGET_HANDLE cover_widget;
 
-// The path to the database (but will probably eventually be
-// yet another handle).
-struct IMAGE_DB_HANDLE image_db;
+};
 
-int display_init ( struct IMAGE_DB_HANDLE handle )
+struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
+				     struct MPD_HANDLE mpd )
 {
-  image_db = handle;
+  struct DISPLAY_HANDLE handle;
+  handle.d = malloc( sizeof( struct DISPLAY_PRIVATE ) );
+  handle.d->status      = 0;
+  handle.d->image_db    = image_db;
+  handle.d->mpd         = mpd;
+  handle.d->egl_display = EGL_NO_DISPLAY;
+  handle.d->egl_surface = EGL_NO_SURFACE;
 
   // There is a lot which can go wrong here. But evidently this can't
   // fail!
@@ -116,7 +122,8 @@ int display_init ( struct IMAGE_DB_HANDLE handle )
   if ( dspmx_ret < 0 ) {
     printf( "Error: (VC) Could not the display size for display 0: code %d\n",
 	    dspmx_ret );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
   DISPMANX_DISPLAY_HANDLE_T dspmx_display;
@@ -124,7 +131,8 @@ int display_init ( struct IMAGE_DB_HANDLE handle )
 
   if ( dspmx_display == DISPMANX_NO_HANDLE ) {
     printf( "Error: (VC) Could not open display 0\n" );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
   DISPMANX_UPDATE_HANDLE_T dspmx_update;
@@ -132,7 +140,8 @@ int display_init ( struct IMAGE_DB_HANDLE handle )
 
   if ( dspmx_update == DISPMANX_NO_HANDLE ) {
     printf( "Error: (VC) Could not get update handle\n" );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
   // After a lot of experimentation, I decided to just render into a
@@ -173,7 +182,8 @@ int display_init ( struct IMAGE_DB_HANDLE handle )
 					   0  /* transform */ );
   if ( dspmx_element == DISPMANX_NO_HANDLE ) {
     printf( "Error: (VC) Could not create element (aka window)\n" );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
   dspmx_ret = vc_dispmanx_update_submit_sync( dspmx_update );
@@ -181,28 +191,32 @@ int display_init ( struct IMAGE_DB_HANDLE handle )
   if ( dspmx_ret < 0 ) {
     printf( "Error: (VC) Could not complete element update: code %d\n",
 	    dspmx_ret );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
-  egl_display = eglGetDisplay( EGL_DEFAULT_DISPLAY );
+  handle.d->egl_display = eglGetDisplay( EGL_DEFAULT_DISPLAY );
 
-  if ( egl_display == EGL_NO_DISPLAY ) {
+  if ( handle.d->egl_display == EGL_NO_DISPLAY ) {
     printf( "Error: Could not open the EGL display\n" );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
-  EGLBoolean egl_inited = eglInitialize( egl_display, NULL, NULL );
+  EGLBoolean egl_inited = eglInitialize( handle.d->egl_display, NULL, NULL );
 
   if ( egl_inited == EGL_FALSE ) {
     printf( "Error: Could not initialize EGL display: %s\n", egl_carp() );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
   EGLBoolean egl_got_api = eglBindAPI( EGL_OPENVG_API );
 
   if ( egl_got_api == EGL_FALSE ) {
     printf( "Error: Could not bind OpenVG API: %s (OpenVG is probably not suppoerted)\n", egl_carp() );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
   EGLint    egl_attrs[] = {
@@ -219,63 +233,74 @@ int display_init ( struct IMAGE_DB_HANDLE handle )
   EGLConfig egl_config;
   EGLint    egl_n_configs = 0;
 
-  EGLBoolean got_config  = eglChooseConfig( egl_display,
+  EGLBoolean got_config  = eglChooseConfig( handle.d->egl_display,
 					    egl_attrs, &egl_config, 1,
 					    &egl_n_configs );
 
   if ( got_config == EGL_FALSE ) {
     printf( "Error: Could not find a usable config: %s\n", egl_carp() );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
   else if ( egl_n_configs == 0 ) {
     printf( "Error: No matching EGL configs\n" );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
   // Now connect the DISPMANX window to the EGL context. Note again
   // that the native_window object has to hang around until the
   // program is done.
-  native_window.element = dspmx_element;
-  native_window.width   = window_width;
-  native_window.height  = window_height;
+  handle.d->native_window.element = dspmx_element;
+  handle.d->native_window.width   = window_width;
+  handle.d->native_window.height  = window_height;
 
-  egl_surface = eglCreateWindowSurface( egl_display, egl_config,
-					&native_window, NULL );
+  handle.d->egl_surface = eglCreateWindowSurface( handle.d->egl_display,
+						  egl_config,
+						  &handle.d->native_window,
+						  NULL );
 
-  if ( egl_surface == EGL_NO_SURFACE ) {
+  if ( handle.d->egl_surface == EGL_NO_SURFACE ) {
     printf( "Error: Could not bind VC window to EGL surface: %s\n",
 	    egl_carp() );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
-  EGLContext egl_context = eglCreateContext( egl_display, egl_config,
+  EGLContext egl_context = eglCreateContext( handle.d->egl_display, egl_config,
 					     EGL_NO_CONTEXT, // no sharing
 					     NULL );
 
   if ( egl_context == EGL_NO_CONTEXT ) {
     printf( "Error: Failed to create a rendering context: %s\n",
 	    egl_carp() );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
-  EGLBoolean egl_current = eglMakeCurrent( egl_display, egl_surface,
-					   egl_surface, egl_context );
+  EGLBoolean egl_current = eglMakeCurrent( handle.d->egl_display,
+					   handle.d->egl_surface,
+					   handle.d->egl_surface,
+					   egl_context );
 
   if ( egl_current == EGL_FALSE ) {
     printf( "Error: Failed to make context current: %s\n", egl_carp() );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
   if ( eglGetError() != EGL_SUCCESS ) {
     printf( "Error: Hmm. something happened which wasn't reported: 0x%x\n",
 	    eglGetError() );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
   vgSetfv( VG_CLEAR_COLOR, 4, background );
   if ( eglGetError() != EGL_SUCCESS ) {
     printf( "Error: EGL Couldn't set background color 0x%x\n", eglGetError() );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
   if ( vgGetError() != VG_NO_ERROR ) {
     printf( "Error: VG Couldn't set background color 0x%x\n", vgGetError() );
@@ -283,11 +308,13 @@ int display_init ( struct IMAGE_DB_HANDLE handle )
   vgClear( 0, 0, window_width, window_height );
   if ( eglGetError() != EGL_SUCCESS ) {
     printf( "Error: EGL Couldn't clear window\n" );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
   if ( vgGetError() != VG_NO_ERROR ) {
     printf( "Error: VG Couldn't clear window 0x%x\n", vgGetError() );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
   size_t pattern_size =
@@ -416,7 +443,7 @@ int display_init ( struct IMAGE_DB_HANDLE handle )
   vgSetParameterfv( thermometer_paint, VG_PAINT_COLOR_RAMP_STOPS,
 		    4 * 5, fill_stops );
 
-  metadata_widget =
+  handle.d->metadata_widget =
     text_widget_init( border_thickness, border_thickness,
 		      tv_width / 2.f - 1.5f * border_thickness,
 		      tv_height - 2.f * border_thickness,
@@ -424,12 +451,13 @@ int display_init ( struct IMAGE_DB_HANDLE handle )
 
   // \bug widget height is a judgement text_widget should really
   // have a vertical centering option.
-  time_widget = text_widget_init( tv_width / 2.f + border_thickness / 2.f,
-				  border_thickness,
-				  image_edge, time_height - border_thickness,
-				  dpmm_x, dpmm_y );
+  handle.d->time_widget =
+    text_widget_init( tv_width / 2.f + border_thickness / 2.f,
+		      border_thickness,
+		      image_edge, time_height - border_thickness,
+		      dpmm_x, dpmm_y );
 
-  text_widget_set_alignment( time_widget, TEXT_WIDGET_ALIGN_CENTER );
+  text_widget_set_alignment( handle.d->time_widget, TEXT_WIDGET_ALIGN_CENTER );
 
   // The cover widget. Where is it going to go? Need to specify
   // the width and height carefully so that the aspect ratio is
@@ -439,21 +467,23 @@ int display_init ( struct IMAGE_DB_HANDLE handle )
   float iw_width_mm = image_edge;
   float iw_height_mm = iw_width_mm;
 
-  cover_widget = image_widget_init( iw_x_mm, iw_y_mm,
-				    iw_width_mm, iw_height_mm,
-				    dpmm_x, dpmm_y );
+  handle.d->cover_widget = image_widget_init( iw_x_mm, iw_y_mm,
+					      iw_width_mm, iw_height_mm,
+					      dpmm_x, dpmm_y );
 
-  EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
+  EGLBoolean swapped = eglSwapBuffers( handle.d->egl_display,
+				       handle.d->egl_surface );
 
   if ( swapped == EGL_FALSE ) {
     printf( "Error: Could not swap EGL buffers: %s\n", egl_carp() );
-    return -1;
+    handle.d->status = -1;
+    return handle;
   }
 
-  return 0;
+  return handle;
 }
 
-int display_update ( const struct MPD_HANDLE handle )
+void display_update ( struct DISPLAY_HANDLE handle )
 {
   // For now, this is very simple. Redraw the whole screen.
 
@@ -471,24 +501,24 @@ int display_update ( const struct MPD_HANDLE handle )
 
   vgPaintPattern( frame_paint, fg_brush );
 
-  if ( mpd_changed( handle,
+  if ( mpd_changed( handle.d->mpd,
 		    MPD_CHANGED_ARTIST | MPD_CHANGED_ALBUM | MPD_CHANGED_TITLE ) ) {
     char* buffer =
       g_markup_printf_escaped( "<span font=\"Droid Sans 24px\">%s\n<i>%s</i>\n<b>%s</b></span>",
-			       mpd_artist( handle ),
-			       mpd_album( handle ),
-			       mpd_title( handle ) );
+			       mpd_artist( handle.d->mpd ),
+			       mpd_album( handle.d->mpd ),
+			       mpd_title( handle.d->mpd ) );
 
     GString* w_buf = g_string_new( buffer ); // For counting the characters.
 
-    text_widget_set_text( metadata_widget, w_buf->str, w_buf->len );
+    text_widget_set_text( handle.d->metadata_widget, w_buf->str, w_buf->len );
 
     g_string_free( w_buf, TRUE );
   }
 
-  struct MPD_TIMES times = mpd_times( handle );
+  struct MPD_TIMES times = mpd_times( handle.d->mpd );
 
-  if ( mpd_changed( handle,
+  if ( mpd_changed( handle.d->mpd,
 		    MPD_CHANGED_ELAPSED | MPD_CHANGED_TOTAL ) ) {
     char* buffer =
       g_markup_printf_escaped( "<span font=\"Droid Sans 24px\">%02ld:%02ld / %02ld:%02ld</span>",
@@ -499,7 +529,7 @@ int display_update ( const struct MPD_HANDLE handle )
 
     GString* w_buf = g_string_new( buffer ); // For counting the characters.
 
-    text_widget_set_text( time_widget, w_buf->str, w_buf->len );
+    text_widget_set_text( handle.d->time_widget, w_buf->str, w_buf->len );
 
     g_string_free( w_buf, TRUE );
 
@@ -529,17 +559,22 @@ int display_update ( const struct MPD_HANDLE handle )
   vgSetPaint( thermometer_paint, VG_FILL_PATH );
   vgDrawPath( thermometer_path, VG_FILL_PATH );
 
-  text_widget_draw_text( metadata_widget );
+  text_widget_draw_text( handle.d->metadata_widget );
 
-  text_widget_draw_text( time_widget );
+  text_widget_draw_text( handle.d->time_widget );
 
-  if ( mpd_changed( handle, MPD_CHANGED_ALBUM ) ) {
+  if ( mpd_changed( handle.d->mpd, MPD_CHANGED_ALBUM ) ) {
     struct IMAGE_HANDLE cover_image_handle =
-      cover_image( image_db, mpd_artist( handle ), mpd_album( handle ) );
-    image_widget_set_image( cover_widget, cover_image_handle );
+      cover_image( handle.d->image_db,
+		   mpd_artist( handle.d->mpd ),
+		   mpd_album( handle.d->mpd ) );
+    image_widget_set_image( handle.d->cover_widget, cover_image_handle );
+    // I guess we're responsible for this and can assume that the
+    // widget doesn't need it anymore.
+    image_rgba_free( cover_image_handle );
   }
 
-  image_widget_draw_image( cover_widget );
+  image_widget_draw_image( handle.d->cover_widget );
 
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
   vgLoadIdentity();
@@ -549,23 +584,37 @@ int display_update ( const struct MPD_HANDLE handle )
 
   vgDrawPath( frame_path, VG_FILL_PATH );
 
-  EGLBoolean swapped = eglSwapBuffers( egl_display, egl_surface );
+  EGLBoolean swapped = eglSwapBuffers( handle.d->egl_display,
+				       handle.d->egl_surface );
 
   if ( swapped == EGL_FALSE ) {
     printf( "Error: Could not swap EGL buffers: %s\n", egl_carp() );
-    return -1;
+    handle.d->status = -1;
   }
-
-  return 0;
 }
 
-int display_close ( void )
+int display_status ( struct DISPLAY_HANDLE handle )
 {
-  eglTerminate( egl_display );
+  if ( handle.d != 0 ) {
+    return handle.d->status;
+  }
+  return -1;
+}
 
-  image_db_free( image_db );
+void display_close ( struct DISPLAY_HANDLE handle )
+{
+  if ( handle.d != NULL ) {
+    text_widget_free_handle( handle.d->metadata_widget );
+    text_widget_free_handle( handle.d->time_widget );
+    image_widget_free_handle( handle.d->cover_widget );
 
-  return 0;
+    eglTerminate( handle.d->egl_display );
+    // \bug what about the native window?
+    image_db_free( handle.d->image_db );
+
+    free( handle.d );
+    handle.d = NULL;
+  }
 }
 
 static const char* egl_carp ( void )

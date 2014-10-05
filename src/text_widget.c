@@ -248,13 +248,13 @@ void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
 
 void text_widget_free_handle ( struct TEXT_WIDGET_HANDLE handle )
 {
-  if ( handle.d != 0 ) {
+  if ( handle.d != NULL ) {
     g_object_unref( handle.d->layout );
     g_object_unref( handle.d->context );
     g_object_unref( handle.d->font_map );
     vgDestroyPaint( handle.d->foreground );
     free( handle.d );
-    handle.d = 0;
+    handle.d = NULL;
   }
 }
 

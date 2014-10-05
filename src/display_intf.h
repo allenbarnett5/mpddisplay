@@ -7,21 +7,34 @@
 struct MPD_HANDLE;
 struct IMAGE_DB_HANDLE;
 
+struct DISLPAY_PRIVATE;
+
+struct DISPLAY_HANDLE {
+  struct DISPLAY_PRIVATE* d;
+};
+
 /*!
  * Initialize the display.
- * \param[in] handle path to an open image database connector.
- * \return 0 if everything went ok, -1 otherwise.
+ * \param[in] image_db image database connector.
+ * \param[in] mpd connection to MPD.
+ * \return a handle to the display.
  */
-int display_init ( struct IMAGE_DB_HANDLE handle );
+struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
+				     struct MPD_HANDLE mpd );
 /*!
- * Update the display using the MPD information.
- * \param[in] handle the MPD object.
- * \return 0 if everything went ok, -1 otherwise.
+ * The structure is opaque so every access has to be through
+ * a function call.
+ * \return 0 if everything is ok, -1 otherwise.
  */
-int display_update ( const struct MPD_HANDLE handle );
+int display_status ( struct DISPLAY_HANDLE handle );
+/*!
+ * Update the display.
+ * \param[in] handle our display.
+ */
+void display_update ( struct DISPLAY_HANDLE handle );
 /*!
  * Restore the display to whatever it showed before.
- * \return 0 if everything went ok, -1 otherwise.
+ * \param[in] handle the display handle to close.
  */
-int display_close ( void );
+void display_close ( struct DISPLAY_HANDLE handle  );
 #endif

@@ -105,3 +105,12 @@ void image_widget_draw_image ( struct IMAGE_WIDGET_HANDLE handle )
 
   vgDrawImage( handle.d->image );
 }
+
+void image_widget_free_handle ( struct IMAGE_WIDGET_HANDLE handle )
+{
+  if ( handle.d != NULL ) {
+    vgDestroyImage( handle.d->image );
+    free( handle.d );
+    handle.d = NULL;
+  }
+}
