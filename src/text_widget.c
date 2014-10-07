@@ -37,9 +37,13 @@ struct VG_DATA* vg_data_new ( void )
 
 void vg_data_free ( void* vg_data_ptr )
 {
-  if ( vg_data_ptr != NULL ) {
-    vgDestroyFont( ((struct VG_DATA*)vg_data_ptr)->font );
-    free( vg_data_ptr );
+  // Evidently, this pointer is the FT_Size object to which
+  // we attached our data.
+  FT_Size size = (FT_Size)vg_data_ptr;
+  struct VG_DATA* data = (struct VG_DATA*)size->generic.data;
+  if ( data != NULL ) {
+    vgDestroyFont( data->font );
+    free( data );
   }
 }
 
@@ -245,6 +249,8 @@ void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
       pango_fc_font_unlock_face( (PangoFcFont*)pg_font );
     }
   } while ( pango_layout_iter_next_run( li ) );
+  // Iterators are not free.
+  pango_layout_iter_free( li);
 }
 
 void text_widget_free_handle ( struct TEXT_WIDGET_HANDLE handle )

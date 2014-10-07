@@ -509,11 +509,11 @@ void display_update ( struct DISPLAY_HANDLE handle )
 			       mpd_album( handle.d->mpd ),
 			       mpd_title( handle.d->mpd ) );
 
-    GString* w_buf = g_string_new( buffer ); // For counting the characters.
+    size_t len = strlen( buffer );
 
-    text_widget_set_text( handle.d->metadata_widget, w_buf->str, w_buf->len );
+    text_widget_set_text( handle.d->metadata_widget, buffer, len );
 
-    g_string_free( w_buf, TRUE );
+    g_free( buffer );
   }
 
   struct MPD_TIMES times = mpd_times( handle.d->mpd );
@@ -527,11 +527,11 @@ void display_update ( struct DISPLAY_HANDLE handle )
 			       times.total / 60,
 			       times.total % 60 );
 
-    GString* w_buf = g_string_new( buffer ); // For counting the characters.
+    size_t len = strlen( buffer );
 
-    text_widget_set_text( handle.d->time_widget, w_buf->str, w_buf->len );
+    text_widget_set_text( handle.d->time_widget, buffer, len );
 
-    g_string_free( w_buf, TRUE );
+    g_free( buffer );
 
     vgClearPath( thermometer_path, VG_PATH_CAPABILITY_ALL );
 
@@ -564,11 +564,14 @@ void display_update ( struct DISPLAY_HANDLE handle )
   text_widget_draw_text( handle.d->time_widget );
 
   if ( mpd_changed( handle.d->mpd, MPD_CHANGED_ALBUM ) ) {
+
     struct IMAGE_HANDLE cover_image_handle =
       cover_image( handle.d->image_db,
 		   mpd_artist( handle.d->mpd ),
 		   mpd_album( handle.d->mpd ) );
+
     image_widget_set_image( handle.d->cover_widget, cover_image_handle );
+
     // I guess we're responsible for this and can assume that the
     // widget doesn't need it anymore.
     image_rgba_free( cover_image_handle );
