@@ -278,6 +278,9 @@ void add_pibrella_button ( gpointer data )
 		      gpio_file, err->message );
     return;
   }
+  else {
+    log_message_info( logger, "Opened GPIO \"%s\"", gpio_file );
+  }
 
   ret = g_io_add_watch( button, G_IO_PRI, button_callback, data );
 
