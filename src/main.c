@@ -245,6 +245,8 @@ gboolean button_callback ( GIOChannel* gio,
   else {
     if ( byte == '1' ) {
 #if 0
+      // This needs a lot more work to send commands to mpd. Probably
+      // should port this program to libmpdclient.
       struct MPD_HANDLE mpd = ((struct MAIN_DATA*)data)->mpd;
       mpd_play_pause( mpd );
 #else
@@ -263,19 +265,42 @@ void add_pibrella_button ( gpointer data )
   struct MAIN_DATA* main_data = data;
   struct LOG_HANDLE logger = main_data->logger;
 
+  // We want the interrupt mode. But /sys/class/gpio operations
+  // are usually privileged. So, we call out to the "gpio" program.
+  gchar*  stdout_buffer = NULL;
+  gchar*  stderr_buffer = NULL;
+  gint    exit_status   = 0;
+  GError* error         = NULL;
+  gboolean result =
+    g_spawn_command_line_sync( "gpio edge 11 rising",
+			       &stdout_buffer, &stderr_buffer, &exit_status,
+			       &error );
+
+  if ( ! result ) {
+    log_message_warn( logger, "Could not set button to rising interrupt: %s",
+		      error->message );
+    g_error_free( error );
+    return;
+  }
+  else {
+    g_free( stdout_buffer );
+    g_free( stderr_buffer );
+  }
+
   GIOChannel* button;
-  GError* err = NULL;
 
   guint ret;
   char* gpio_file = "/sys/class/gpio/gpio11/value";
+  error = NULL;
 
   // Well, it goes without saying that the GPIO pin should be an
   // argument to the program.
-  button = g_io_channel_new_file( gpio_file, "r", &err );
+  button = g_io_channel_new_file( gpio_file, "r", &error );
 
   if ( ! button ) {
     log_message_warn( logger, "Could not open GPIO file \"%s\": %s",
-		      gpio_file, err->message );
+		      gpio_file, error->message );
+    g_error_free( error );
     return;
   }
   else {
