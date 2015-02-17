@@ -221,23 +221,27 @@ gboolean button_callback ( GIOChannel* gio,
   GIOStatus status;
   gchar byte;
   gsize bytes_read;
-  GError* err = NULL;
+  GError* error = NULL;
 
   log_message_info( logger, "Called the button callback" );
 
-  status = g_io_channel_seek_position( gio, 0, G_SEEK_SET, &err );
+  status = g_io_channel_seek_position( gio, 0, G_SEEK_SET, &error );
 
   if ( status == G_IO_STATUS_ERROR ) {
-    log_message_warn( logger, "Error seeking button: %s", err->message );
+    log_message_warn( logger, "Error seeking button: %s", error->message );
+
+    g_error_free( error );
     return TRUE;
   }
 
+  error = NULL;
   // OK. But the button really needs to be debounced...
-
-  status = g_io_channel_read_chars( gio, &byte, 1, &bytes_read, &err );
+  status = g_io_channel_read_chars( gio, &byte, 1, &bytes_read, &error );
 
   if ( status == G_IO_STATUS_ERROR ) {
-    log_message_warn( logger, "Error reading button: %s", err->message );
+    log_message_warn( logger, "Error reading button: %s", error->message );
+
+    g_error_free( error );
   }
   else if ( bytes_read == 0 ) {
     log_message_warn( logger, "Read button OK but no data" );
