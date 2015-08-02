@@ -23,7 +23,8 @@ static int convert_int ( const char* string );
 static gboolean poll_mpd ( gpointer data );
 static gboolean reconnect_mpd ( gpointer data );
 
-static void add_pibrella_button ( gpointer data );
+static void add_pibrella_button10 ( gpointer data );
+static void add_pibrella_button11 ( gpointer data );
 
 const char* USAGE = "usage: %s [--host hostname] [--port port#] [--database databse]\n";
 
@@ -40,7 +41,11 @@ int main ( int argc, char* argv[] )
   // We have to be told where MPD is running.
   int c;
   char* host = "guanaco"; // Well, that's mine. Maybe this should be localhost.
+#if 0
   char* port = "6600";    // The standard MPD port.
+#else
+  int   port = 6600;    // The standard MPD port.
+#endif
   char* database = "album_art.sqlite3";
   bool bad_argument = false;
 
@@ -71,6 +76,7 @@ int main ( int argc, char* argv[] )
       host = optarg;
       break;
     case 'p':
+#if 0
       port = optarg;
       {
 	int port_n = convert_int( optarg );
@@ -84,6 +90,20 @@ int main ( int argc, char* argv[] )
 	  printf( "--port argument must be positive (%s)\n", port );
 	}
       }
+#else
+      {
+	port = convert_int( optarg );
+	if ( errno != 0 ) {
+	  bad_argument = true;
+	  printf( "--port argument was not a valid integer: '%s' (%s)\n",
+		  optarg, strerror( errno ) );
+	}
+	if ( port <= 0 ) {
+	  bad_argument = true;
+	  printf( "--port argument must be positive (%d)\n", port );
+	}
+      }
+#endif
       break;
     case 'd':
       if ( *optarg == '\0' ) {
@@ -103,7 +123,7 @@ int main ( int argc, char* argv[] )
   }
 
   log_message_info( main_data.logger, "MPD host: '%s'", host );
-  log_message_info( main_data.logger, "MPD port: '%s'", port );
+  log_message_info( main_data.logger, "MPD port: '%d'", port );
   log_message_info( main_data.logger, "Database: '%s'", database );
 
   main_data.mpd = mpd_create( host, port, main_data.logger );
@@ -132,9 +152,10 @@ int main ( int argc, char* argv[] )
   // Poll MPD periodically.
   (void)g_timeout_add_seconds( 1, poll_mpd, &main_data );
 
-  // Also try to poll the button on the Pibrella (if it is configured
+  // Also try to poll the buttons on the Pibrella (if it is configured
   // properly).
-  add_pibrella_button( &main_data );
+  add_pibrella_button10( &main_data );
+  add_pibrella_button11( &main_data );
 
   g_main_loop_run( main_data.loop );
 
@@ -208,9 +229,9 @@ gboolean poll_mpd ( gpointer data )
   return TRUE;
 }
 
-gboolean button_callback ( GIOChannel* gio,
-			   GIOCondition condition,
-			   gpointer data )
+gboolean play_pause_button_callback ( GIOChannel* gio,
+				      GIOCondition condition,
+				      gpointer data )
 {
   // Don't bother with anything if it's not the interrupt.
   if ( condition != G_IO_PRI ) {
@@ -248,23 +269,64 @@ gboolean button_callback ( GIOChannel* gio,
   }
   else {
     if ( byte == '1' ) {
-#if 0
-      // This needs a lot more work to send commands to mpd. Probably
-      // should port this program to libmpdclient.
       struct MPD_HANDLE mpd = ((struct MAIN_DATA*)data)->mpd;
       mpd_play_pause( mpd );
-#else
-      // For now, use the button to exit!
-      log_message_warn( logger, "Button: Exiting main loop" );
-      g_main_loop_quit( ((struct MAIN_DATA*)data)->loop );
-#endif
     }
   }
 
   return TRUE;
 }
 
-void add_pibrella_button ( gpointer data )
+gboolean exit_button_callback ( GIOChannel* gio,
+				GIOCondition condition,
+				gpointer data )
+{
+  // Don't bother with anything if it's not the interrupt.
+  if ( condition != G_IO_PRI ) {
+    return TRUE;
+  }
+
+  struct LOG_HANDLE logger = ((struct MAIN_DATA*)data)->logger;
+  GIOStatus status;
+  gchar byte;
+  gsize bytes_read;
+  GError* error = NULL;
+
+  log_message_info( logger, "Called the button callback" );
+
+  status = g_io_channel_seek_position( gio, 0, G_SEEK_SET, &error );
+
+  if ( status == G_IO_STATUS_ERROR ) {
+    log_message_warn( logger, "Error seeking button: %s", error->message );
+
+    g_error_free( error );
+    return TRUE;
+  }
+
+  error = NULL;
+  // OK. But the button really needs to be debounced...
+  status = g_io_channel_read_chars( gio, &byte, 1, &bytes_read, &error );
+
+  if ( status == G_IO_STATUS_ERROR ) {
+    log_message_warn( logger, "Error reading button: %s", error->message );
+
+    g_error_free( error );
+  }
+  else if ( bytes_read == 0 ) {
+    log_message_warn( logger, "Read button OK but no data" );
+  }
+  else {
+    if ( byte == '1' ) {
+      // Use the button to exit!
+      log_message_warn( logger, "Button: Exiting main loop" );
+      g_main_loop_quit( ((struct MAIN_DATA*)data)->loop );
+    }
+  }
+
+  return TRUE;
+}
+
+void add_pibrella_button11 ( gpointer data )
 {
   struct MAIN_DATA* main_data = data;
   struct LOG_HANDLE logger = main_data->logger;
@@ -281,7 +343,7 @@ void add_pibrella_button ( gpointer data )
 			       &error );
 
   if ( ! result ) {
-    log_message_warn( logger, "Could not set button to rising interrupt: %s",
+    log_message_warn( logger, "Could not set gpio 11 button to rising interrupt: %s",
 		      error->message );
     g_error_free( error );
     return;
@@ -311,7 +373,62 @@ void add_pibrella_button ( gpointer data )
     log_message_info( logger, "Opened GPIO \"%s\"", gpio_file );
   }
 
-  ret = g_io_add_watch( button, G_IO_PRI, button_callback, data );
+  ret = g_io_add_watch( button, G_IO_PRI, play_pause_button_callback, data );
+
+  if ( ! ret ) {
+    log_message_warn( logger, "Error creating watch on button" );
+    return;
+  }
+}
+
+void add_pibrella_button10 ( gpointer data )
+{
+  struct MAIN_DATA* main_data = data;
+  struct LOG_HANDLE logger = main_data->logger;
+
+  // We want the interrupt mode. But /sys/class/gpio operations
+  // are usually privileged. So, we call out to the "gpio" program.
+  gchar*  stdout_buffer = NULL;
+  gchar*  stderr_buffer = NULL;
+  gint    exit_status   = 0;
+  GError* error         = NULL;
+  gboolean result =
+    g_spawn_command_line_sync( "gpio edge 10 rising",
+			       &stdout_buffer, &stderr_buffer, &exit_status,
+			       &error );
+
+  if ( ! result ) {
+    log_message_warn( logger, "Could not set gpio 10 button to rising interrupt: %s",
+		      error->message );
+    g_error_free( error );
+    return;
+  }
+  else {
+    g_free( stdout_buffer );
+    g_free( stderr_buffer );
+  }
+
+  GIOChannel* button;
+
+  guint ret;
+  char* gpio_file = "/sys/class/gpio/gpio10/value";
+  error = NULL;
+
+  // Well, it goes without saying that the GPIO pin should be an
+  // argument to the program.
+  button = g_io_channel_new_file( gpio_file, "r", &error );
+
+  if ( ! button ) {
+    log_message_warn( logger, "Could not open GPIO file \"%s\": %s",
+		      gpio_file, error->message );
+    g_error_free( error );
+    return;
+  }
+  else {
+    log_message_info( logger, "Opened GPIO \"%s\"", gpio_file );
+  }
+
+  ret = g_io_add_watch( button, G_IO_PRI, exit_button_callback, data );
 
   if ( ! ret ) {
     log_message_warn( logger, "Error creating watch on button" );

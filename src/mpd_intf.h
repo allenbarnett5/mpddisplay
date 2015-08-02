@@ -49,11 +49,17 @@ struct MPD_TIMES {
  * \param[in] host the host name.
  * \param[in] port the port (well, really this is the "service" passed
  * to getaddrinfo()).
+ * \param[in] port the port (an integer port#, not a "service")
  * \param[in,out] logger the handle to the logger service.
  * \return a handle to the MPD connection.
  */
+#if 0
 struct MPD_HANDLE mpd_create ( const char* host, const char* port,
 			       struct LOG_HANDLE logger );
+#else
+struct MPD_HANDLE mpd_create ( const char* host, int port,
+			       struct LOG_HANDLE logger );
+#endif
 /*!
  * Somehow we lost our connection, so we try to connect again.
  * \param[in,out] handle MPD connection.

@@ -18,7 +18,7 @@ text_widget.o magick_image.o cover_image.o no_cover.o image_widget.o \
 pattern.o log_intf.o \
 -L /opt/vc/lib -lGLESv2 -lEGL -lbcm_host \
 -lpangoft2-1.0 -lpango-1.0 -lfreetype -lglib-2.0 -lgobject-2.0 \
--lMagickWand -lsqlite3 -llog4c
+-lMagickWand -lsqlite3 -llog4c -lmpdclient
 
 no_cover.o: no_cover.png
 	$(OBJCOPY) --input-target=binary --output-target=$(BFDNAME) \
