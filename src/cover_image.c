@@ -5,6 +5,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "sqlite3.h"
 
@@ -16,7 +17,8 @@
 extern const unsigned char _binary_no_cover_png_start;
 extern const unsigned char _binary_no_cover_png_end;
 
-// If we can't get a cover image for some reason, use this one.
+// If there is no entry in the database, return this warning image.
+
 struct IMAGE_HANDLE no_cover ( void )
 {
   // If we reach here, we haven't found an image.
@@ -24,6 +26,21 @@ struct IMAGE_HANDLE no_cover ( void )
     &_binary_no_cover_png_end - &_binary_no_cover_png_start; 
 
   return image_rgba_create( &_binary_no_cover_png_start, no_cover_size );
+}
+
+// The empty cover is compiled into the code.
+extern const unsigned char _binary_empty_cover_png_start;
+extern const unsigned char _binary_empty_cover_png_end;
+
+// If nothing is being displayed (for instance if playback is stopped
+// at the end of a playlist), return this empty image.
+
+struct IMAGE_HANDLE empty_cover ( void )
+{
+  size_t empty_cover_size =
+    &_binary_empty_cover_png_end - &_binary_empty_cover_png_start;
+
+  return image_rgba_create( &_binary_empty_cover_png_start, empty_cover_size );
 }
 
 /*!
@@ -61,7 +78,11 @@ struct IMAGE_HANDLE cover_image ( struct IMAGE_DB_HANDLE handle,
 				  const char* artist, const char* album )
 {
   if ( handle.d == NULL || handle.d->db == NULL ) {
-    return no_cover();
+    return empty_cover();
+  }
+
+  if ( strlen( artist ) == 0 && strlen( album ) == 0 ) {
+    return empty_cover();
   }
 
   int rc;
