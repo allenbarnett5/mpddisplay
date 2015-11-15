@@ -11,6 +11,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <linux/input.h>
+
 #include "glib.h"
 
 #include "mpd_intf.h"
@@ -25,7 +27,7 @@ static gboolean reconnect_mpd ( gpointer data );
 
 static void add_pibrella_button10 ( gpointer data );
 static void add_pibrella_button11 ( gpointer data );
-static void add_mouse ( gpointer data );
+static void add_event ( gpointer data );
 
 const char* USAGE = "usage: %s [--host hostname] [--port port#] [--database databse]\n";
 
@@ -40,15 +42,13 @@ struct MAIN_DATA {
 int main ( int argc, char* argv[] )
 {
   // We have to be told where MPD is running.
-  int c;
   char* host = "guanaco"; // Well, that's mine. Maybe this should be localhost.
-#if 0
-  char* port = "6600";    // The standard MPD port.
-#else
-  int   port = 6600;    // The standard MPD port.
-#endif
+  int   port = 6600;      // The standard MPD port.
+  // Default database.
   char* database = "album_art.sqlite3";
+
   bool bad_argument = false;
+  int c;
 
   // Start the logger.
   main_data.logger = log_init();
@@ -159,7 +159,7 @@ int main ( int argc, char* argv[] )
   add_pibrella_button11( &main_data );
 
   // Mouse or touch screen events.
-  add_mouse( &main_data );
+  add_event( &main_data );
 
   g_main_loop_run( main_data.loop );
 
@@ -440,7 +440,7 @@ void add_pibrella_button10 ( gpointer data )
   }
 }
 
-gboolean mouse_button_callback ( GIOChannel* gio,
+gboolean event_button_callback ( GIOChannel* gio,
 				 GIOCondition condition,
 				 gpointer data )
 {
@@ -448,73 +448,105 @@ gboolean mouse_button_callback ( GIOChannel* gio,
 
   struct MAIN_DATA* main_data = data;
   struct LOG_HANDLE logger = main_data->logger;
+#if 0
   gchar bytes[3];
+#else
+  struct input_event event;
+#endif
   gsize bytes_read;
   GError* error = NULL;
   GIOStatus status;
 
-  log_message_info( logger, "Eek! A mouse!" );
-
   error = NULL;
-  // OK. But the button really needs to be debounced...
-  status = g_io_channel_read_chars( gio, bytes, 3, &bytes_read, &error );
+
+  status = g_io_channel_read_chars( gio, (gchar*)&event, sizeof event,
+				    &bytes_read, &error );
 
   if ( status == G_IO_STATUS_ERROR ) {
-    log_message_warn( logger, "Error reading mouse: %s", error->message );
+    log_message_warn( logger, "Error reading event: %s", error->message );
 
     g_error_free( error );
   }
   else if ( bytes_read == 0 ) {
-    log_message_warn( logger, "Read mouse OK but no data" );
+    log_message_warn( logger, "Read event OK but no data" );
   }
   else {
-    log_message_warn( logger, "Read 3 bytes from mouse: %d %d %d",
-		      bytes[0], bytes[1], bytes[2] );
+    switch ( event.type ) {
+    case EV_SYN:
+      log_message_warn( logger, "SYN %d [%d] event", event.code, event.value );
+      break;
+    case EV_KEY:
+      log_message_warn( logger, "KEY %d [%d] event", event.code, event.value );
+      break;
+    case EV_REL:
+      log_message_warn( logger, "REL event" );
+      break;
+    case EV_ABS:
+      switch ( event.code ) {
+      case ABS_X:
+	log_message_warn( logger, "ABS X [%d] event", event.value ); break;
+      case ABS_Y:
+	log_message_warn( logger, "ABS Y [%d] event", event.value ); break;
+      case ABS_Z:
+	log_message_warn( logger, "ABS Z [%d] event", event.value ); break;
+      default:
+	log_message_warn( logger, "ABS %d [%d] event", event.code, event.value );
+	break;
+      }
+      break;
+    case EV_MSC:
+      log_message_warn( logger, "MSC %d [%d] event", event.code, event.value );
+      break;
+    default:
+      log_message_warn( logger, "%d [%d [%d]] event", event.type, event.code,
+			event.value ); 
+      break;
+    }
   }
 
   return TRUE;
 }
 
-void add_mouse ( gpointer data )
+void add_event ( gpointer data )
 {
   struct MAIN_DATA* main_data = data;
   struct LOG_HANDLE logger = main_data->logger;
 
-  GIOChannel* mouse;
+  GIOChannel* event;
   GIOStatus status;
 
   guint ret;
-  char* mouse_file = "/dev/input/mice";
+  char* event_file = "/dev/input/event0";
   GError* error    = NULL;
 
-  mouse = g_io_channel_new_file( mouse_file, "r", &error );
+  event = g_io_channel_new_file( event_file, "r", &error );
 
-  if ( ! mouse ) {
-    log_message_warn( logger, "Could not open mouse file \"%s\": %s",
-		      mouse_file, error->message );
+  if ( ! event ) {
+    log_message_warn( logger, "Could not open event file \"%s\": %s",
+		      event_file, error->message );
     g_error_free( error );
     return;
   }
   else {
-    log_message_info( logger, "Opened mouse \"%s\"", mouse_file );
+    log_message_info( logger, "Opened event \"%s\"", event_file );
   }
 
   // The default encoding is UTF-8 and we're just reading binary
   // data.
-  status = g_io_channel_set_encoding( mouse, NULL, &error );
+  status = g_io_channel_set_encoding( event, NULL, &error );
 
   if ( status == G_IO_STATUS_ERROR ) {
-    log_message_warn( logger, "Error setting mouse encoding: %s",
+    log_message_warn( logger, "Error setting event encoding: %s",
 		      error->message );
     g_error_free( error );
 
     return;
   }
 
-  ret = g_io_add_watch( mouse, G_IO_IN, mouse_button_callback, data );
+  ret = g_io_add_watch( event, G_IO_IN, event_button_callback, data );
 
   if ( ! ret ) {
-    log_message_warn( logger, "Error creating watch on mouse" );
+    log_message_warn( logger, "Error creating watch on event" );
     return;
   }
 }
