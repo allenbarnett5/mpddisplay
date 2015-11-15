@@ -9,16 +9,17 @@ CFLAGS = -g -Wall -Wextra -MMD \
 -I /usr/lib/arm-linux-gnueabihf/glib-2.0/include \
 -I /usr/include/pango-1.0 \
 -I /usr/include/freetype2 \
--I /usr/include/ImageMagick
+-I /usr/include/gdk-pixbuf-2.0
 
 mpddisplay: main.o mpd_intf.o display_intf.o text_widget.o \
-magick_image.o cover_image.o no_cover.o image_widget.o pattern.o log_intf.o
+image_intf.o cover_image.o no_cover.o image_widget.o pattern.o log_intf.o
 	gcc -o mpddisplay main.o mpd_intf.o display_intf.o \
-text_widget.o magick_image.o cover_image.o no_cover.o image_widget.o \
+text_widget.o image_intf.o cover_image.o no_cover.o image_widget.o \
 pattern.o log_intf.o \
 -L /opt/vc/lib -lGLESv2 -lEGL -lbcm_host \
--lpangoft2-1.0 -lpango-1.0 -lfreetype -lglib-2.0 -lgobject-2.0 \
--lMagickWand -lsqlite3 -llog4c -lmpdclient
+-lpangoft2-1.0 -lpango-1.0 -lfreetype \
+-lgio-2.0 -lgdk_pixbuf-2.0 -lglib-2.0 -lgobject-2.0 \
+-lsqlite3 -llog4c -lmpdclient
 
 no_cover.o: no_cover.png
 	$(OBJCOPY) --input-target=binary --output-target=$(BFDNAME) \
@@ -32,4 +33,4 @@ clean:
 	rm -f *.o mpddisplay
 
 -include main.d mpd_intf.d display_intf.d text_widget.d \
-magick_image.d cover_image.d image_widget.d log_intf.d
+image_intf.d cover_image.d image_widget.d log_intf.d

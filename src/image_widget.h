@@ -4,7 +4,7 @@
 #ifndef IMAGE_WIDGET_H
 #define IMAGE_WIDGET_H
 
-#include "magick_image.h"
+#include "image_intf.h"
 
 struct IMAGE_WIDGET_PRIVATE;
 

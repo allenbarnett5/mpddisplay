@@ -1,8 +1,8 @@
 /*
- * Wrap the ImageMagick MagickWand in another layer.
+ * Wrap the image handling library in another layer.
  */
-#ifndef MAGICK_IMAGE_H
-#define MAGICK_IMAGE_H
+#ifndef IMAGE_INTF_H
+#define IMAGE_INTF_H
 
 struct IMAGE_HANDLE {
   struct IMAGE_HANDLE_PRIVATE* d;
@@ -11,10 +11,8 @@ struct IMAGE_HANDLE {
 /*!
  * This function takes a pointer to a memory buffer containing the
  * given kind of image. The handle it returns can be used to extract
- * an RGBA image suitable for instantiating in OpenVG. It uses the
- * ImageMagick library to do all the work.
- * \param type the type of data in the buffer. Must be something
- * that ImageMagick recognizes like "PNG" or "JPG".
+ * an RGBA image suitable for instantiating in OpenVG.
+ * \param type the type of data in the buffer.
  * \param data pointer to the data.
  * \param n_bytes number of bytes in the data.
  */

@@ -8,7 +8,7 @@
 
 #include "sqlite3.h"
 
-#include "magick_image.h"
+#include "image_intf.h"
 #include "log_intf.h"
 #include "cover_image.h"
 

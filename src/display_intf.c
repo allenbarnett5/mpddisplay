@@ -17,7 +17,7 @@
 #include "image_widget.h"
 #include "cover_image.h"
 #include "display_intf.h"
-#include "magick_image.h"
+#include "image_intf.h"
 
 static const char* egl_carp ( void );
 
