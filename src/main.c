@@ -444,6 +444,8 @@ gboolean mouse_button_callback ( GIOChannel* gio,
 				 GIOCondition condition,
 				 gpointer data )
 {
+  (void)condition;
+
   struct MAIN_DATA* main_data = data;
   struct LOG_HANDLE logger = main_data->logger;
   gchar bytes[3];

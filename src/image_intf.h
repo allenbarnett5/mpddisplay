@@ -12,12 +12,10 @@ struct IMAGE_HANDLE {
  * This function takes a pointer to a memory buffer containing the
  * given kind of image. The handle it returns can be used to extract
  * an RGBA image suitable for instantiating in OpenVG.
- * \param type the type of data in the buffer.
  * \param data pointer to the data.
  * \param n_bytes number of bytes in the data.
  */
-struct IMAGE_HANDLE image_rgba_create ( const char* type,
-					const unsigned char* data,
+struct IMAGE_HANDLE image_rgba_create ( const unsigned char* data,
 					size_t n_bytes );
 
 /*!

@@ -23,7 +23,7 @@ struct IMAGE_HANDLE no_cover ( void )
   size_t no_cover_size =
     &_binary_no_cover_png_end - &_binary_no_cover_png_start; 
 
-  return image_rgba_create( "PNG", &_binary_no_cover_png_start, no_cover_size );
+  return image_rgba_create( &_binary_no_cover_png_start, no_cover_size );
 }
 
 /*!
@@ -82,15 +82,13 @@ struct IMAGE_HANDLE cover_image ( struct IMAGE_DB_HANDLE handle,
 
   if ( rc == SQLITE_OK ) {
     while ( sqlite3_step( stmt ) == SQLITE_ROW ) {
-      const char* format;
       const unsigned char* image;
       size_t n_bytes;
-      format = (const char*)sqlite3_column_text( stmt, 0 );
       n_bytes = sqlite3_column_bytes( stmt, 1 );
       image = sqlite3_column_blob( stmt, 1 );
       if ( n_bytes == 0 )
 	break;
-      return image_rgba_create( format, image, n_bytes );
+      return image_rgba_create( image, n_bytes );
     }
   }
 

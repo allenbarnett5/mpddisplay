@@ -320,8 +320,7 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
   size_t pattern_size =
     &_binary_pattern_png_end - &_binary_pattern_png_start;
 
-  struct IMAGE_HANDLE pattern = image_rgba_create( "PNG",
-						   &_binary_pattern_png_start,
+  struct IMAGE_HANDLE pattern = image_rgba_create( &_binary_pattern_png_start,
 						   pattern_size );
   int pattern_width = image_rgba_width( pattern );
   int pattern_height = image_rgba_height( pattern );
@@ -404,8 +403,7 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
 	   );
 
   // Thermometer box.
-  float residual_height =
-    tv_height - border_thickness - image_edge_length - border_thickness;
+
   // This should really be a function of the font height.
   float therm_height = 2.f * font_size_mm;
   float therm_width  = image_edge_length;

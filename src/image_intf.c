@@ -15,8 +15,7 @@ struct IMAGE_HANDLE_PRIVATE {
   GdkPixbuf* pb;
 };
 
-struct IMAGE_HANDLE image_rgba_create ( const char* type,
-					const unsigned char* data,
+struct IMAGE_HANDLE image_rgba_create ( const unsigned char* data,
 					size_t n_bytes )
 {
   struct IMAGE_HANDLE handle;
