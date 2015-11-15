@@ -27,11 +27,17 @@ struct IMAGE_HANDLE image_rgba_create ( const unsigned char* data,
 
   GInputStream* stream = g_memory_input_stream_new_from_data( data, n_bytes,
 							      NULL );
-  GError* err = NULL;
+  GError* error = NULL;
 
-  GdkPixbuf* original = gdk_pixbuf_new_from_stream( stream, NULL, &err );
+  GdkPixbuf* original = gdk_pixbuf_new_from_stream( stream, NULL, &error );
 
-  // OpenVG insists on an alpha channel.
+  if ( original == NULL ) {
+    g_error_free( error );
+    g_clear_object( &stream );
+  }
+
+  // OpenVG insists on an alpha channel. I should think this could fail.
+  // Yes is can but with no error message.
   handle.d->pb = gdk_pixbuf_add_alpha( original, FALSE, 0, 0, 0 );
 
   // Hopefully, we've made a copy of the data now.
