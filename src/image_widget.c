@@ -73,7 +73,11 @@ void image_widget_set_image ( struct IMAGE_WIDGET_HANDLE handle,
     1., 0., 0., 0., // R-src -> {RGBA}-dest
     0., 1., 0., 0., // G-src -> {RGBA}-dest
     0., 0., 1., 0., // B-src -> {RGBA}-dest
+#if 0
     0., 0., 0., 0.5, // A-src -> {RGBA}-dest
+#else
+    0., 0., 0., 0.75, // A-src -> {RGBA}-dest
+#endif
     0., 0., 0., 0.  // const -> {RGBA}-dest
   };
 
@@ -91,8 +95,10 @@ void image_widget_draw_image ( struct IMAGE_WIDGET_HANDLE handle )
     return;
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_IMAGE_USER_TO_SURFACE );
   vgLoadIdentity();
+#if 0
   // Overscan.
   vgTranslate( 14.f, 8.f );
+#endif
   // Values in mm all around.
   vgScale( handle.d->dpmm_x, handle.d->dpmm_y );
   // Move to the corner.

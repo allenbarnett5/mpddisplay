@@ -47,21 +47,21 @@ extern const unsigned char _binary_pattern_png_end;
 // which we can play with to make the screen look better.
 
 // Approximate # of horz blanking NTSC DISPMANX pixels on *my* TV
-static const VGfloat vc_frame_x = 14.f;
+static const VGfloat vc_frame_x = 0.f;//14.f;
 // Approximate # of vert blanking NTSC DISPMANX lines on *my* TV
-static const VGfloat vc_frame_y =  8.f;
+static const VGfloat vc_frame_y =  0.f;//8.f;
 // Approximate width of *my* TV in mm
-static const VGfloat tv_width = 95.25f;
+static const VGfloat tv_width = 108.74f; //95.25f;
 // Approximate height of *my* TV in mm
-static const VGfloat tv_height = 53.975f;
+static const VGfloat tv_height = 65.89f; //53.975f;
 // Approximate # of visible NTSC DISPMANX pixels on *my* TV
-static const VGfloat vc_frame_width = 698.f;
+static const VGfloat vc_frame_width = 800.f; //698.f;
 // Approximate # of visible NTSC DISPMANX lines on *my* TV
-static const VGfloat vc_frame_height = 461.f;
+static const VGfloat vc_frame_height = 480.f; //461.f;
 // Resolution in X d/mm. (converts a distance to pixels)
-static const VGfloat dpmm_x = 698./95.25; // vc_frame_width / tv_width;
+static const VGfloat dpmm_x = 800.f/108.74f; //698./95.25; // vc_frame_width / tv_width;
 // Resolution in Y d/mm. (converts a distance to pixels)
-static const VGfloat dpmm_y = 461./53.975; // vc_frame_height / tv_height;
+static const VGfloat dpmm_y = 480.f/65.89f; //461./53.975; // vc_frame_height / tv_height;
 // Background color and alpha
 static const VGfloat background[] = { 0.f, 0.f, 0.f, 1.f };
 
@@ -394,23 +394,30 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
 	   round_radius, round_radius );
 
   // Image box.
-  float image_edge = tv_width / 2.f - 1.5 * border_thickness;
+  float image_edge_length = tv_width / 2.f - 1.5 * border_thickness;
   vguRoundRect( frame_path,
 	   tv_width / 2.f + border_thickness / 2.f,
-	   tv_height - border_thickness - image_edge,
-	   image_edge,
-	   image_edge,
+	   tv_height - border_thickness - image_edge_length,
+	   image_edge_length,
+	   image_edge_length,
 	   round_radius, round_radius
 	   );
 
   // Thermometer box.
-  float time_height = tv_height - border_thickness - image_edge - border_thickness - border_thickness;
+  float residual_height =
+    tv_height - border_thickness - image_edge_length - border_thickness;
+  // This should really be a function of the font height.
+  float therm_height = 2.f * font_size_mm;
+  float therm_width  = image_edge_length;
+  float therm_x      = tv_width / 2.f + border_thickness / 2.f;
+  float therm_y      = border_thickness;
+
   vguRoundRect( frame_path,
-	   tv_width / 2.f + border_thickness / 2.f,
-	   border_thickness,
-	   image_edge,
-	   time_height,
-	   round_radius, round_radius );
+		therm_x,
+		therm_y,
+		therm_width,
+		therm_height,
+		round_radius, round_radius );
 
   vgSetPaint( frame_paint, VG_FILL_PATH );
 
@@ -431,7 +438,7 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
 
   vgSetParameteri( thermometer_paint, VG_PAINT_TYPE, VG_PAINT_TYPE_LINEAR_GRADIENT );
   VGfloat gradient_points[] = { 0.f, border_thickness,
-				0.f, border_thickness + time_height };
+				0.f, border_thickness + therm_height };
   vgSetParameterfv( thermometer_paint, VG_PAINT_LINEAR_GRADIENT,
 		    4, gradient_points );
   float fill_stops[] = {
@@ -454,7 +461,7 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
   handle.d->time_widget =
     text_widget_init( tv_width / 2.f + border_thickness / 2.f,
 		      border_thickness,
-		      image_edge, time_height - border_thickness,
+		      image_edge_length, therm_height - border_thickness,
 		      dpmm_x, dpmm_y );
 
   text_widget_set_alignment( handle.d->time_widget, TEXT_WIDGET_ALIGN_CENTER );
@@ -463,8 +470,8 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
   // the width and height carefully so that the aspect ratio is
   // correct.
   float iw_x_mm = tv_width / 2.f + border_thickness / 2.f;
-  float iw_y_mm = tv_height - border_thickness - image_edge;
-  float iw_width_mm = image_edge;
+  float iw_y_mm = tv_height - border_thickness - image_edge_length;
+  float iw_width_mm = image_edge_length;
   float iw_height_mm = iw_width_mm;
 
   handle.d->cover_widget = image_widget_init( iw_x_mm, iw_y_mm,

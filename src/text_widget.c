@@ -175,8 +175,10 @@ void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
 
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
   vgLoadIdentity();
+#if 0
   // Overscan (in dots, evidently).
   vgTranslate( 14.f, 8.f );
+#endif
   // Offset in mm.
   vgScale( handle.d->dpmm_x, handle.d->dpmm_y );
   // Move to the corner.
