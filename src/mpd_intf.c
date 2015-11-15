@@ -198,8 +198,14 @@ static void get_song_string ( struct mpd_song* song,
 {
   unsigned int i = 0;
   const char* value; // This is UTF-8 according to the docs.
-  while ( ( value = mpd_song_get_tag( song, type, i++ ) ) != NULL ) {
+  while ( ( value = mpd_song_get_tag( song, type, i ) ) != NULL ) {
+    if ( i > 0 ) {
+      g_string_append( result, " - " );
+    }
+
     g_string_append( result, value );
+
+    ++i;
   }
 }
 
@@ -213,6 +219,7 @@ static int mpd_get_current ( struct mpd_connection* connection,
 			     struct MPD_CURRENT* previous )
 #endif
 {
+  //  printf( "In get_current\n" );
   // So, this is the nub of it. Send a command to MPD and await its
   // response.
 #if 0
@@ -307,9 +314,13 @@ static int mpd_get_current ( struct mpd_connection* connection,
   mpd_command_list_begin( connection, true );
   mpd_send_status( connection );
   mpd_send_current_song( connection );
+  //  printf( "list end\n" );
   mpd_command_list_end( connection );
-
+  //  printf( "list end done\nreceiving status\n" );
+  
   struct mpd_status* status = mpd_recv_status( connection );
+
+  //  printf( "got status\n" );
 
   if ( status == NULL ) {
     log_message_error( logger, "error retrieving status" );
@@ -341,6 +352,7 @@ static int mpd_get_current ( struct mpd_connection* connection,
   default:
     break;
   }
+
   // I can already tell this needs some rearrangment.
   previous->changed = 0;
   if ( previous->play_status != current.play_status ) {
@@ -369,6 +381,7 @@ static int mpd_get_current ( struct mpd_connection* connection,
     get_song_string( song, MPD_TAG_ARTIST, current.artist );
     get_song_string( song, MPD_TAG_ALBUM, current.album );
     get_song_string( song, MPD_TAG_TITLE, current.title );
+    //    printf( "state: %d: '%s'\n", current.play_status, current.title->str );
     mpd_song_free( song );
   }
 
@@ -422,7 +435,7 @@ static int mpd_get_current ( struct mpd_connection* connection,
   }
 #endif
   mpd_current_free( &current ); // This is something of an annoyance.
-
+  //  printf( "returning %d\n", previous->changed );
   return 0;
 }
 #if 0
