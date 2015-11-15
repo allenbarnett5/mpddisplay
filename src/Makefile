@@ -32,5 +32,7 @@ pattern.o: pattern.png
 clean:
 	rm -f *.o mpddisplay
 
+extraclean: clean
+	rm -f *.d
 -include main.d mpd_intf.d display_intf.d text_widget.d \
 image_intf.d cover_image.d image_widget.d log_intf.d
