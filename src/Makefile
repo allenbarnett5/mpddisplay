@@ -1,7 +1,7 @@
 OBJCOPY = objcopy
 BFDNAME = elf32-littlearm
 BFDARCH = arm
-CFLAGS = -g -Wall -Wextra -MMD \
+CFLAGS = -g -Wall -Wextra -Wstrict-prototypes -MMD \
 -I /opt/vc/include \
 -I /opt/vc/include/interface/vcos/pthreads \
 -I /opt/vc/include/interface/vmcs_host/linux \

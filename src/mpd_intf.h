@@ -53,13 +53,8 @@ struct MPD_TIMES {
  * \param[in,out] logger the handle to the logger service.
  * \return a handle to the MPD connection.
  */
-#if 0
-struct MPD_HANDLE mpd_create ( const char* host, const char* port,
-			       struct LOG_HANDLE logger );
-#else
 struct MPD_HANDLE mpd_create ( const char* host, int port,
 			       struct LOG_HANDLE logger );
-#endif
 /*!
  * Somehow we lost our connection, so we try to connect again.
  * \param[in,out] handle MPD connection.
@@ -92,6 +87,10 @@ int mpd_poll( struct MPD_HANDLE handle );
  * state has changed.
  */
 bool mpd_changed ( const struct MPD_HANDLE handle, int flags );
+/*!
+ * \return the play status.
+ */
+enum MPD_PLAY_STATUS mpd_play_status ( const struct MPD_HANDLE handle );
 /*!
  * \return the current artist.
  */

@@ -582,7 +582,27 @@ void display_update ( struct DISPLAY_HANDLE handle )
     image_rgba_free( cover_image_handle );
   }
 
+  if ( mpd_changed( handle.d->mpd, MPD_CHANGED_STATUS ) ) {
+    enum MPD_PLAY_STATUS status = mpd_play_status( handle.d->mpd );
+    enum IMAGE_WIDGET_EMBLEM emblem = IMAGE_WIDGET_EMBLEM_NOEMBLEM;
+    switch ( status ) {
+    case MPD_PLAY_STATUS_STOPPED:
+      emblem = IMAGE_WIDGET_EMBLEM_STOPPED; break;
+    case MPD_PLAY_STATUS_PLAYING:
+      emblem = IMAGE_WIDGET_EMBLEM_PLAYING; break;
+    case MPD_PLAY_STATUS_PAUSED:
+      emblem = IMAGE_WIDGET_EMBLEM_PAUSED; break;
+    default:
+      break;
+    }
+    image_widget_set_emblem( handle.d->cover_widget, emblem );
+  }
+
   image_widget_draw_image( handle.d->cover_widget );
+
+  vgSeti( VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE );
+  vgLoadIdentity();
+  vgScale( dpmm_x, dpmm_y );
 
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
   vgLoadIdentity();

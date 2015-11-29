@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #include "VG/openvg.h"
+#include "VG/vgu.h"
 
 #include "image_widget.h"
 
@@ -19,8 +20,13 @@ struct IMAGE_WIDGET_PRIVATE {
   int image_height;
   float scale_x;
   float scale_y;
+  enum IMAGE_WIDGET_EMBLEM emblem;
   VGImage image;
 };
+
+static void image_widget_stopped ( VGPaint color, VGPath path );
+static void image_widget_playing ( VGPaint color, VGPath path );
+static void image_widget_paused  ( VGPaint color, VGPath path );
 
 struct IMAGE_WIDGET_HANDLE image_widget_init ( float x_mm, float y_mm,
 					       float width_mm,
@@ -36,6 +42,7 @@ struct IMAGE_WIDGET_HANDLE image_widget_init ( float x_mm, float y_mm,
   handle.d->height_mm = height_mm;
   handle.d->dpmm_x = dpmm_x;
   handle.d->dpmm_y = dpmm_y;
+  handle.d->emblem = IMAGE_WIDGET_EMBLEM_NOEMBLEM;
   return handle;
 }
 
@@ -73,11 +80,7 @@ void image_widget_set_image ( struct IMAGE_WIDGET_HANDLE handle,
     1., 0., 0., 0., // R-src -> {RGBA}-dest
     0., 1., 0., 0., // G-src -> {RGBA}-dest
     0., 0., 1., 0., // B-src -> {RGBA}-dest
-#if 0
-    0., 0., 0., 0.5, // A-src -> {RGBA}-dest
-#else
     0., 0., 0., 0.75, // A-src -> {RGBA}-dest
-#endif
     0., 0., 0., 0.  // const -> {RGBA}-dest
   };
 
@@ -87,6 +90,15 @@ void image_widget_set_image ( struct IMAGE_WIDGET_HANDLE handle,
 
   handle.d->scale_x = handle.d->width_mm  / handle.d->image_width;
   handle.d->scale_y = handle.d->height_mm / handle.d->image_height;
+}
+
+void image_widget_set_emblem ( struct IMAGE_WIDGET_HANDLE handle,
+			       enum IMAGE_WIDGET_EMBLEM emblem )
+{
+  if ( handle.d == NULL )
+    return;
+
+  handle.d->emblem = emblem;
 }
 
 void image_widget_draw_image ( struct IMAGE_WIDGET_HANDLE handle )
@@ -110,6 +122,45 @@ void image_widget_draw_image ( struct IMAGE_WIDGET_HANDLE handle )
   vgScale( handle.d->scale_x, -handle.d->scale_y );
 
   vgDrawImage( handle.d->image );
+
+  if ( handle.d->emblem != IMAGE_WIDGET_EMBLEM_NOEMBLEM ) {
+    VGPath path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
+				VG_PATH_DATATYPE_F,
+				1.0f, 0.0f,
+				0, 0,
+				VG_PATH_CAPABILITY_ALL );
+    VGPaint color = vgCreatePaint();
+
+    vgSeti( VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE );
+    vgLoadIdentity();
+    // Draw in mm as usual.
+    vgScale( handle.d->dpmm_x, handle.d->dpmm_y );
+    // Move to the corner of the window.
+    vgTranslate( handle.d->x_mm, handle.d->y_mm );
+    // Drawing is generally in the lower right corner inside a 1 cm x 1 cm
+    // box.
+    vgTranslate( handle.d->width_mm - 10.f, 0.f );
+
+    switch ( handle.d->emblem ) {
+    case IMAGE_WIDGET_EMBLEM_STOPPED:
+      image_widget_stopped( color, path );
+      break;
+    case IMAGE_WIDGET_EMBLEM_PLAYING:
+      image_widget_playing( color, path );
+      break;
+    case IMAGE_WIDGET_EMBLEM_PAUSED:
+      image_widget_paused( color, path );
+      break;
+    default:
+      break;
+    }
+
+    vgSetPaint( color, VG_FILL_PATH );
+    vgDrawPath( path, VG_FILL_PATH );
+
+    vgDestroyPaint( color );
+    vgDestroyPath( path );
+  }
 }
 
 void image_widget_free_handle ( struct IMAGE_WIDGET_HANDLE handle )
@@ -119,4 +170,37 @@ void image_widget_free_handle ( struct IMAGE_WIDGET_HANDLE handle )
     free( handle.d );
     handle.d = NULL;
   }
+}
+
+void image_widget_stopped ( VGPaint color, VGPath path )
+{
+  VGfloat octagon[] = { 5.f - 2.071f, 0.f,
+			5.f + 2.071f, 0.f,
+			10.f, 5.f - 2.071f,
+			10.f, 5.f + 2.071f,
+			5.f + 2.071f, 10.f,
+			5.f - 2.071f, 10.f,
+			0.f, 5.f + 2.071f,
+			0.f, 5.f - 2.071f, };
+  VGfloat foreground[] = { 1.f, 1.f, 1.f, 0.25f };
+  vgSetParameterfv( color, VG_PAINT_COLOR, 4, foreground );
+  vguPolygon( path, octagon, 8, VG_TRUE );
+}
+
+void image_widget_playing ( VGPaint color, VGPath path )
+{
+  VGfloat triangle[] = {  0.f,  0.f,
+			  0.f, 10.f,
+			 10.f,  5.f };
+  VGfloat foreground[] = { 1.f, 1.f, 1.f, 0.25f };
+  vgSetParameterfv( color, VG_PAINT_COLOR, 4, foreground );
+  vguPolygon( path, triangle, 3, VG_TRUE );
+}
+
+void image_widget_paused ( VGPaint color, VGPath path )
+{
+  VGfloat foreground[] = { 1.f, 1.f, 1.f, 0.25f };
+  vgSetParameterfv( color, VG_PAINT_COLOR, 4, foreground );
+  vguRect( path, 0.f, 0.f, 3.f, 10.f );
+  vguRect( path, 7.f, 0.f, 3.f, 10.f );
 }
