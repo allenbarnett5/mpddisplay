@@ -587,7 +587,14 @@ void display_update ( struct DISPLAY_HANDLE handle )
     enum IMAGE_WIDGET_EMBLEM emblem = IMAGE_WIDGET_EMBLEM_NOEMBLEM;
     switch ( status ) {
     case MPD_PLAY_STATUS_STOPPED:
-      emblem = IMAGE_WIDGET_EMBLEM_STOPPED; break;
+      if ( strlen( mpd_artist( handle.d->mpd ) ) == 0 ||
+	   strlen( mpd_album( handle.d->mpd ) ) == 0 ) {
+	emblem = IMAGE_WIDGET_EMBLEM_NOEMBLEM;
+      }
+      else {
+	emblem = IMAGE_WIDGET_EMBLEM_STOPPED;
+      }
+      break;
     case MPD_PLAY_STATUS_PLAYING:
       emblem = IMAGE_WIDGET_EMBLEM_PLAYING; break;
     case MPD_PLAY_STATUS_PAUSED:
