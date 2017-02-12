@@ -155,8 +155,9 @@ void image_widget_draw_image ( struct IMAGE_WIDGET_HANDLE handle )
       break;
     }
 
-    vgSetPaint( color, VG_FILL_PATH );
-    vgDrawPath( path, VG_FILL_PATH );
+    vgSetf( VG_STROKE_LINE_WIDTH, 0.5f );
+    vgSetPaint( color, VG_STROKE_PATH );
+    vgDrawPath( path, VG_STROKE_PATH );
 
     vgDestroyPaint( color );
     vgDestroyPath( path );
