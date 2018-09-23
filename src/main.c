@@ -28,6 +28,9 @@ static gboolean reconnect_mpd ( gpointer data );
 static void add_pibrella_button10 ( gpointer data );
 static void add_pibrella_button11 ( gpointer data );
 static void add_event ( gpointer data );
+static gboolean play_pause_button_callback ( GIOChannel* gio,
+					     GIOCondition condition,
+					     gpointer data );
 
 const char* USAGE = "usage: %s [--host hostname] [--port port#] [--database databse]\n";
 
@@ -36,6 +39,8 @@ struct MAIN_DATA {
   struct MPD_HANDLE mpd;
   struct LOG_HANDLE logger;
   struct IMAGE_DB_HANDLE image_db;
+  GIOChannel* play_button;
+  uint play_source;
   GMainLoop* loop;
 } main_data;
 
@@ -233,6 +238,22 @@ gboolean poll_mpd ( gpointer data )
   return TRUE;
 }
 
+gboolean debounce ( gpointer data )
+{
+  // Toggle the play back. Note: This is a bit sloppy; we should
+  // probably test that the button is still down.
+  struct MPD_HANDLE mpd = ((struct MAIN_DATA*)data)->mpd;
+  mpd_play_pause( mpd );
+
+  // Re-add button to the main loop.
+  GIOChannel* button = ((struct MAIN_DATA*)data)->play_button;
+  uint source = g_io_add_watch( button, G_IO_PRI, play_pause_button_callback, data );
+  ((struct MAIN_DATA*)data)->play_source = source;
+
+  // Don't call this again.
+  return FALSE;
+}
+
 gboolean play_pause_button_callback ( GIOChannel* gio,
 				      GIOCondition condition,
 				      gpointer data )
@@ -247,8 +268,6 @@ gboolean play_pause_button_callback ( GIOChannel* gio,
   gchar byte;
   gsize bytes_read;
   GError* error = NULL;
-
-  log_message_info( logger, "Called the button callback" );
 
   status = g_io_channel_seek_position( gio, 0, G_SEEK_SET, &error );
 
@@ -273,8 +292,10 @@ gboolean play_pause_button_callback ( GIOChannel* gio,
   }
   else {
     if ( byte == '1' ) {
-      struct MPD_HANDLE mpd = ((struct MAIN_DATA*)data)->mpd;
-      mpd_play_pause( mpd );
+      // Don't respond to interrupts for a while.
+      uint source = ((struct MAIN_DATA*)data)->play_source;
+      g_source_remove( source );
+      g_timeout_add( 250 /*ms*/, debounce, data );
     }
   }
 
@@ -295,8 +316,6 @@ gboolean exit_button_callback ( GIOChannel* gio,
   gchar byte;
   gsize bytes_read;
   GError* error = NULL;
-
-  log_message_info( logger, "Called the button callback" );
 
   status = g_io_channel_seek_position( gio, 0, G_SEEK_SET, &error );
 
@@ -359,7 +378,7 @@ void add_pibrella_button11 ( gpointer data )
 
   GIOChannel* button;
 
-  guint ret;
+  guint source;
   char* gpio_file = "/sys/class/gpio/gpio11/value";
   error = NULL;
 
@@ -377,12 +396,15 @@ void add_pibrella_button11 ( gpointer data )
     log_message_info( logger, "Opened GPIO \"%s\"", gpio_file );
   }
 
-  ret = g_io_add_watch( button, G_IO_PRI, play_pause_button_callback, data );
+  source = g_io_add_watch( button, G_IO_PRI, play_pause_button_callback, data );
 
-  if ( ! ret ) {
+  if ( ! source ) {
     log_message_warn( logger, "Error creating watch on button" );
     return;
   }
+
+  main_data->play_button = button;
+  main_data->play_source = source;
 }
 
 void add_pibrella_button10 ( gpointer data )
