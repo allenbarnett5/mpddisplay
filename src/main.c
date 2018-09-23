@@ -226,7 +226,7 @@ gboolean poll_mpd ( gpointer data )
   if ( status != 0 ) {
     log_message_warn( main_data->logger,
 		      "We lost our connection to MPD. Trying again shortly." );
-    (void)g_timeout_add_seconds( 1, reconnect_mpd, data );
+    (void)g_timeout_add_seconds( 3, reconnect_mpd, data );
     return FALSE;
   }
 

@@ -103,10 +103,18 @@ static int mpd_get_current ( struct mpd_connection* connection,
   // response.
   struct MPD_CURRENT current;
   mpd_current_init( &current );
-  mpd_command_list_begin( connection, true );
-  mpd_send_status( connection );
-  mpd_send_current_song( connection );
-  mpd_command_list_end( connection );
+  if ( ! mpd_command_list_begin( connection, true ) ) {
+    log_message_error( logger, "could not begin command list" );
+  }
+  if ( ! mpd_send_status( connection ) ) {
+    log_message_error( logger, "could not send \"status\"" );
+  }
+  if ( ! mpd_send_current_song( connection ) ) {
+    log_message_error( logger, "could not send \"current song\"" );
+  }
+  if ( ! mpd_command_list_end( connection ) ) {
+    log_message_error( logger, "could not end command list" );
+  }
   
   struct mpd_status* status = mpd_recv_status( connection );
 
@@ -236,11 +244,27 @@ int mpd_reconnect ( struct MPD_HANDLE handle )
     return -1;
   }
 
+  log_message_info( handle.d->logger, "starting new connection." );
   handle.d->connection = mpd_connection_new( handle.d->host->str,
 					     handle.d->port,
 					     0 ); // <- timeout: 0->default
+  log_message_info( handle.d->logger, "new connection returned %x.", 
+		    handle.d->connection );
 
+  enum mpd_error well = mpd_connection_get_error( handle.d->connection );
+  if ( well == MPD_ERROR_SUCCESS ) {
+    log_message_info( handle.d->logger, "appears to have worked" );
+  }
+  else {
+    log_message_info( handle.d->logger, "meh: %s", mpd_connection_get_error_message( handle.d->connection ) );
+  }
+#if 0
   return mpd_status( handle );
+#else
+  if ( well != MPD_ERROR_SUCCESS )
+    return -1;
+  return 0;
+#endif
 }
 
 int mpd_status ( const struct MPD_HANDLE handle )
