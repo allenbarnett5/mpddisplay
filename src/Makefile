@@ -13,10 +13,10 @@ CFLAGS = -g -Wall -Wextra -Wstrict-prototypes -MMD \
 
 mpddisplay: main.o mpd_intf.o display_intf.o text_widget.o \
 image_intf.o cover_image.o no_cover.o image_widget.o pattern.o log_intf.o \
-empty_cover.o
+empty_cover.o button_widget.o
 	gcc -o mpddisplay main.o mpd_intf.o display_intf.o \
 text_widget.o image_intf.o cover_image.o no_cover.o image_widget.o \
-pattern.o log_intf.o empty_cover.o \
+pattern.o log_intf.o empty_cover.o button_widget.o \
 -L /opt/vc/lib -lGLESv2 -lEGL -lbcm_host \
 -lpangoft2-1.0 -lpango-1.0 -lfreetype \
 -lgio-2.0 -lgdk_pixbuf-2.0 -lglib-2.0 -lgobject-2.0 \
@@ -39,5 +39,5 @@ clean:
 
 extraclean: clean
 	rm -f *.d
--include main.d mpd_intf.d display_intf.d text_widget.d \
-image_intf.d cover_image.d image_widget.d log_intf.d
+-include main.d main.d mpd_intf.d display_intf.d text_widget.d \
+image_intf.d cover_image.d image_widget.d log_intf.d button_widget.d

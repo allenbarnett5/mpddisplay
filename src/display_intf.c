@@ -15,6 +15,7 @@
 #include "mpd_intf.h"
 #include "text_widget.h"
 #include "image_widget.h"
+#include "button_widget.h"
 #include "cover_image.h"
 #include "display_intf.h"
 #include "image_intf.h"
@@ -93,7 +94,9 @@ struct DISPLAY_PRIVATE {
   struct TEXT_WIDGET_HANDLE time_widget;
   // The album cover widget.
   struct IMAGE_WIDGET_HANDLE cover_widget;
-
+  // Some buttons.
+  struct BUTTON_WIDGET_HANDLE play_widget;
+  struct BUTTON_WIDGET_HANDLE stop_widget;
 };
 
 struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
@@ -342,11 +345,11 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
   };
 
   vgColorMatrix( bg_brush, fg_brush, darken );
-
+#if 1
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
   vgLoadIdentity();
   vgScale( 0.1, 0.1 );
-
+#endif
   frame_paint = vgCreatePaint();
   vgSetParameteri( frame_paint, VG_PAINT_TYPE, VG_PAINT_TYPE_PATTERN );
   vgSetParameteri( frame_paint, VG_PAINT_PATTERN_TILING_MODE,
@@ -405,7 +408,7 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
   // Thermometer box.
 
   // This should really be a function of the font height.
-  float therm_height = 2.f * font_size_mm;
+  float therm_height = 1.5f * font_size_mm;
   float therm_width  = image_edge_length;
   float therm_x      = tv_width / 2.f + border_thickness / 2.f;
   float therm_y      = border_thickness;
@@ -459,7 +462,7 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
   handle.d->time_widget =
     text_widget_init( tv_width / 2.f + border_thickness / 2.f,
 		      border_thickness,
-		      image_edge_length, therm_height - border_thickness,
+		      image_edge_length, therm_height/* - border_thickness*/,
 		      dpmm_x, dpmm_y );
 
   text_widget_set_alignment( handle.d->time_widget, TEXT_WIDGET_ALIGN_CENTER );
@@ -476,6 +479,13 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
 					      iw_width_mm, iw_height_mm,
 					      dpmm_x, dpmm_y );
 
+  float bw_height = iw_y_mm - ( therm_y + therm_height );
+  float bw_width  = bw_height;
+#if 0
+  handle.d->play_widget = button_widget_init( iw_x_mm, therm_y + therm_height,
+					      bw_width, bw_height,
+					      dpmm_x, dpmm_y );
+#endif
   EGLBoolean swapped = eglSwapBuffers( handle.d->egl_display,
 				       handle.d->egl_surface );
 
@@ -542,8 +552,11 @@ void display_update ( struct DISPLAY_HANDLE handle )
 
     if ( times.total > 0 ) {
       float image_edge = tv_width / 2.f - 1.5 * border_thickness;
+#if 0
       float time_height = tv_height - border_thickness - image_edge - border_thickness - border_thickness - 2.f * thermometer_gap;
-
+#else
+      float time_height = 1.5 * font_size_mm /*- thermometer_gap*/;
+#endif
       VGfloat thermometer_width =
 	(float)times.elapsed / (float)times.total *
 	( tv_width / 2.f - 1.5f * border_thickness - 2.f * thermometer_gap );
@@ -618,7 +631,9 @@ void display_update ( struct DISPLAY_HANDLE handle )
   vgSetPaint( frame_paint, VG_FILL_PATH );
 
   vgDrawPath( frame_path, VG_FILL_PATH );
-
+#if 0
+  button_widget_draw_button( handle.d->play_widget );
+#endif
   EGLBoolean swapped = eglSwapBuffers( handle.d->egl_display,
 				       handle.d->egl_surface );
 
