@@ -81,7 +81,8 @@ struct IMAGE_HANDLE cover_image ( struct IMAGE_DB_HANDLE handle,
     return empty_cover();
   }
 
-  if ( strlen( artist ) == 0 && strlen( album ) == 0 ) {
+  if ( artist == NULL || album == NULL || 
+       ( strlen( artist ) == 0 && strlen( album ) == 0  ) ) {
     return empty_cover();
   }
 

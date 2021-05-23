@@ -1,7 +1,0 @@
-# I guess until I set up CMake to build out of tree we
-# must ignore the edit and build debris.
-mpddisplay
-*.[od]
-*~
-# Still, this needs to be backed up somehow...
-album_art.sqlite3

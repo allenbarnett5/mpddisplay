@@ -26,14 +26,14 @@ enum IMAGE_WIDGET_EMBLEM {
  * \param[in] y_mm position of the bottom edge in mm.
  * \param[in] width_mm width of the window in mm.
  * \param[in] height_mm height of the window in mm.
- * \param[in] dpmm_x dots per mm in x direction.
- * \param[in] dpmm_y dots per mm in y direction.
+ * \param[in] screen_width_mm width of screen in mm.
+ * \param[in] screen_height_mm height of screen in mm.
  */
 struct IMAGE_WIDGET_HANDLE image_widget_init ( float x_mm, float y_mm,
 					       float width_mm,
 					       float height_mm,
-					       float dpmm_x,
-					       float dpmm_y );
+					       float screen_width_mm,
+					       float screen_height_mm );
 
 /*!
  * Replace the image.

@@ -3,77 +3,34 @@
  * selection.
  */
 #include <stdlib.h>
+#include <stdint.h>
+#include <math.h>
 
 #include "pango/pangoft2.h"
-#include "VG/openvg.h"
-
+#include <GLES3/gl3.h>
+#include "ogles.h"
 #include "text_widget.h"
 
-static float float_from_26_6( FT_Pos x )
-{
-   return (float)x / 64.0f;
-}
-/*!
- * This structure is attached to a FreeType "size" structure. It is
- * only by observation that I determined that Pango tries to keep the
- * number of Font sizes to a minimum. Therefore, I attach this mapping
- * from the FT_Face to the OpenVG face using the spare pointer in the
- * FT_Size structure.
- */
-struct VG_DATA {
-  VGFont font;
-  uint8_t cmap[144]; // Probably should have an expandable structure. But
-		     // we know we don't have any glyphs > 144*8 = 1152.
-		     // Your collection may vary.
-};
-
-struct VG_DATA* vg_data_new ( void )
-{
-  struct VG_DATA* vg_data = malloc( sizeof( struct VG_DATA ) );
-  vg_data->font = vgCreateFont( 256 );
-  memset( vg_data->cmap, 0, sizeof vg_data->cmap );
-  return vg_data;
-}
-
-void vg_data_free ( void* vg_data_ptr )
-{
-  // Evidently, this pointer is the FT_Size object to which
-  // we attached our data.
-  FT_Size size = (FT_Size)vg_data_ptr;
-  struct VG_DATA* data = (struct VG_DATA*)size->generic.data;
-  if ( data != NULL ) {
-    vgDestroyFont( data->font );
-    free( data );
-  }
-}
-
-static void add_char ( VGFont font, FT_Face face, FT_ULong c );
-
 struct TEXT_WIDGET_PRIVATE {
-  float x_mm;
-  float y_mm;
-  float dpmm_x;
-  float dpmm_y;
   PangoFontMap* font_map;
   PangoContext* context;
   PangoLayout* layout;
-  VGPaint foreground;
+  FT_Bitmap paragraph;
+  GLuint texture;
+  GLuint program;
+  GLuint VAO;
 };
-
-static VGfloat DEFAULT_FOREGROUND[] = { 1.f, 1.f, 1.f, 1.f };
 
 struct TEXT_WIDGET_HANDLE text_widget_init ( float x_mm, float y_mm,
 					     float width_mm,
 					     float height_mm,
 					     float dpmm_x,
-					     float dpmm_y )
+					     float dpmm_y,
+                                             float screen_width_mm,
+                                             float screen_height_mm )
 {
   struct TEXT_WIDGET_HANDLE handle;
   handle.d = malloc( sizeof( struct TEXT_WIDGET_PRIVATE ) );
-  handle.d->x_mm = x_mm;
-  handle.d->y_mm = y_mm;
-  handle.d->dpmm_x = dpmm_x;
-  handle.d->dpmm_y = dpmm_y;
   handle.d->font_map = pango_ft2_font_map_new();
 
   // Note: FreeType works in DPI.
@@ -85,13 +42,123 @@ struct TEXT_WIDGET_HANDLE text_widget_init ( float x_mm, float y_mm,
 
   // Pango works in Pango Units. Not exactly clear how the resolution of
   // the font and the size of the rendering box fit together.
-  int width = pango_units_from_double( dpmm_x * width_mm );
-  int height = pango_units_from_double( dpmm_y * height_mm );
+  int b_width = lrint( dpmm_x * width_mm );
+  int b_height = lrint( dpmm_y * height_mm );
+  int width = pango_units_from_double( b_width );
+  int height = pango_units_from_double( b_height );
   pango_layout_set_width( handle.d->layout, width );
   pango_layout_set_height( handle.d->layout, height );
 
-  handle.d->foreground = vgCreatePaint();
-  vgSetParameterfv( handle.d->foreground, VG_PAINT_COLOR, 4, DEFAULT_FOREGROUND );
+  const GLchar* vertex_shader_source =
+    "#version 300 es       \n"
+    "uniform mat4 mv_matrix;\n"
+    "in  vec2 vertex;\n"
+    "in  vec2 texuv;\n"
+    "out vec2 uv;\n"
+    "void main(void) {\n"
+    "  gl_Position = mv_matrix * vec4( vertex, 0., 1. );\n"
+    "  uv          = texuv;\n"
+    "}";
+
+  const GLchar* fragment_shader_source =
+    "#version 300 es\n"
+    "precision mediump float;\n"
+    "in vec2 uv;\n"
+    "uniform sampler2D image_tex;\n"
+    "out vec4 fragColor;\n"
+    "void main(void) {\n"
+    "  float x = texture2D( image_tex, uv.xy ).r;\n"
+    "  fragColor.rgba = vec4( 1., 1., 1., x );\n"
+    "}";
+
+  handle.d->program = OGLEScreateProgram( vertex_shader_source,
+                                          fragment_shader_source );
+
+  glUseProgram( handle.d->program );
+
+  GLuint vertex_attr = glGetAttribLocation( handle.d->program, "vertex" );
+  GLuint texuv_attr  = glGetAttribLocation( handle.d->program, "texuv" );
+  GLuint mv_matrix_u = glGetUniformLocation( handle.d->program, "mv_matrix" );
+  GLuint sampler_u   = glGetUniformLocation( handle.d->program, "image_tex" );
+
+  // Glep. It's column major (or something like that). Could transpose
+  // it in the upload, too.
+
+  GLfloat mv_matrix[] = {
+                         2.f/screen_width_mm, 0.f, 0.f, 0.f,
+                         0.f, 2.f/screen_height_mm, 0.f, 0.f,
+                         0.f, 0.f, 1.f, 0.f,
+                         -1.f, -1.f, 0.f, 1.f
+  };
+
+  glUniformMatrix4fv( mv_matrix_u, 1, GL_FALSE, mv_matrix );
+  glUniform1i( sampler_u, 0 );
+
+  glGenVertexArrays( 1, &handle.d->VAO );
+  glBindVertexArray( handle.d->VAO );
+  GLuint vertex_buffer, texuv_buffer;
+  glGenBuffers( 1, &vertex_buffer );
+  glGenBuffers( 1, &texuv_buffer );
+
+  // Draw in mm.
+  GLfloat square_vertexes[4][2] =
+    {
+     { x_mm,          y_mm },
+     { x_mm+width_mm, y_mm },
+     { x_mm+width_mm, y_mm+height_mm },
+     { x_mm,          y_mm+height_mm },
+    };
+
+  // Remember: if you pass 0 to glVertexAttribPointer, you must
+  // have bound the buffer already.
+  glBindBuffer( GL_ARRAY_BUFFER, vertex_buffer );
+  glVertexAttribPointer( vertex_attr, 2, GL_FLOAT, GL_FALSE,
+                         sizeof(GLfloat[2]), 0 );
+  glBufferData( GL_ARRAY_BUFFER, sizeof(square_vertexes),
+                square_vertexes, GL_STATIC_DRAW );
+  glEnableVertexAttribArray( vertex_attr );
+
+  // Our texture coordinates.
+  GLfloat square_uvs[4][2] =
+    {
+     { 0.f, 1.f },
+     { 1.f, 1.f },
+     { 1.f, 0.f },
+     { 0.f, 0.f },
+    };
+  glBindBuffer( GL_ARRAY_BUFFER, texuv_buffer );
+  glVertexAttribPointer( texuv_attr, 2, GL_FLOAT, GL_FALSE,
+                         sizeof(GLfloat[2]), 0 );
+  glBufferData( GL_ARRAY_BUFFER, sizeof(square_uvs),
+                square_uvs, GL_STATIC_DRAW );
+  glEnableVertexAttribArray( texuv_attr );
+
+  glBindVertexArray( 0 );
+
+  // Is this the easiest way? Leave it to Pango to initialize
+  // the bitmap...
+  handle.d->paragraph.rows = b_height;
+  handle.d->paragraph.width = b_width;
+  handle.d->paragraph.pitch = b_width;
+  handle.d->paragraph.num_grays = 256;
+  handle.d->paragraph.pixel_mode = FT_PIXEL_MODE_GRAY;
+  handle.d->paragraph.buffer = 
+    g_malloc( handle.d->paragraph.rows * handle.d->paragraph.pitch );
+
+  glActiveTexture( GL_TEXTURE0 );
+  glGenTextures( 1, &handle.d->texture );
+  glBindTexture( GL_TEXTURE_2D, handle.d->texture );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+  /* glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); */
+  /* glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); */
+  /* glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); */
+  /* glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE); */
+
+  // Allocate the space for later.
+  glTexImage2D( GL_TEXTURE_2D, 0, // level of detail
+		GL_RED,
+		handle.d->paragraph.width, handle.d->paragraph.rows,  0,
+		GL_RED, GL_UNSIGNED_BYTE, NULL );
 
   return handle;
 }
@@ -111,15 +178,6 @@ void text_widget_set_alignment ( struct TEXT_WIDGET_HANDLE handle,
   }
 }
 
-void text_widget_set_foreground ( struct TEXT_WIDGET_HANDLE handle,
-				  float color[4] )
-{
-  if ( handle.d == NULL )
-    return;
-
-  vgSetParameterfv( handle.d->foreground, VG_PAINT_COLOR, 4, color );
-}
-
 void text_widget_set_text ( struct TEXT_WIDGET_HANDLE handle,
 			    const char* text, int length )
 {
@@ -128,131 +186,35 @@ void text_widget_set_text ( struct TEXT_WIDGET_HANDLE handle,
 
   pango_layout_set_markup( handle.d->layout, text, length );
 
-  // The idea here is to make sure that the VGFont contains
-  // all the glyphs at the proper size so that when we want
-  // to draw, we can can just call vgDrawGlyphs (well, maybe
-  // not since PangoGlyphInfo is not an array of glyph
-  // indexes; aww).
-  PangoLayoutIter* li = pango_layout_get_iter( handle.d->layout );
-  do {
-    PangoLayoutRun* run = pango_layout_iter_get_run( li );
-    if ( run == NULL )
-      continue;
-    PangoFont* font = run->item->analysis.font;
-    // Well, you can see how C is not the most ideal language for
-    // abstraction. Have to read the documentation to discover
-    // that this font is a PangoFcFont.
-    FT_Face face = pango_fc_font_lock_face( (PangoFcFont*)font );
-    if ( face != NULL ) {
-      struct VG_DATA* vg_data = face->size->generic.data;
-      if ( vg_data == NULL ) {
-	vg_data = vg_data_new();
-	face->size->generic.data = vg_data;
-	face->size->generic.finalizer = vg_data_free;
-      }
-      int g;
-      for ( g = 0; g < run->glyphs->num_glyphs; g++ ) {
-	int byte = run->glyphs->glyphs[g].glyph / 8;
-	int bit  = 1 << ( run->glyphs->glyphs[g].glyph & 0x7 );
-	if ( ! ( vg_data->cmap[byte] & bit  ) ) {
-	  vg_data->cmap[byte] |= bit;
-	  add_char( vg_data->font, face, run->glyphs->glyphs[g].glyph );
-	}
-      }
-      pango_fc_font_unlock_face( (PangoFcFont*)font );
-    }
-  } while ( pango_layout_iter_next_run( li ) );
+  memset( handle.d->paragraph.buffer, 0, 
+          handle.d->paragraph.rows * handle.d->paragraph.pitch );
 
-  pango_layout_iter_free( li );
+  // This is cheaping out somewhat. Just let Pango draw the text as a
+  // complete image. Later, we just draw the image.
+  pango_ft2_render_layout( &handle.d->paragraph, handle.d->layout, 0, 0 );
+
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+
+  glBindTexture( GL_TEXTURE_2D, handle.d->texture );
+  glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0,
+                   handle.d->paragraph.pitch, handle.d->paragraph.rows,
+                   GL_RED, GL_UNSIGNED_BYTE, handle.d->paragraph.buffer );
 }
 
 void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle )
 {
   if ( handle.d == NULL || handle.d->layout == NULL )
     return;
+  // Too simple now?
+  glUseProgram( handle.d->program );
+  glBindVertexArray( handle.d->VAO );
+  glBindTexture( GL_TEXTURE_2D, handle.d->texture );
 
-  vgSetPaint( handle.d->foreground, VG_FILL_PATH );
-
-  vgSeti( VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE );
-  vgLoadIdentity();
-#if 0
-  // Overscan (in dots, evidently).
-  vgTranslate( 14.f, 8.f );
-#endif
-  // Offset in mm.
-  vgScale( handle.d->dpmm_x, handle.d->dpmm_y );
-  // Move to the corner.
-  vgTranslate( handle.d->x_mm, handle.d->y_mm );
-  // Back to dots.
-  vgScale( 1.f/handle.d->dpmm_x, 1.f/handle.d->dpmm_y );
-
-  int height = PANGO_PIXELS( pango_layout_get_height( handle.d->layout ) );
-
-  PangoLayoutIter* li = pango_layout_get_iter( handle.d->layout );
-  do {
-    PangoLayoutRun* run = pango_layout_iter_get_run( li );
-    if ( run == NULL )
-      continue;
-
-    PangoRectangle logical_rect;
-    int baseline_pango = pango_layout_iter_get_baseline( li );
-    int baseline_pixel = PANGO_PIXELS( baseline_pango );
-    pango_layout_iter_get_run_extents( li, NULL, &logical_rect );
-    int x_pixel = PANGO_PIXELS( logical_rect.x );
-
-    PangoFont* pg_font = run->item->analysis.font;
-
-    FT_Face face = pango_fc_font_lock_face( (PangoFcFont*)pg_font );
-
-    if ( face != NULL ) {
-
-      struct VG_DATA* vg_data = face->size->generic.data;
-      if ( vg_data != NULL ) {
-	// About the only extra attribute we can manage is the foreground
-	// color. But, it might be nice to render a background color
-	// to see just how badly the text is fitted into the widget
-	// box.
-	GSList* attr_item = run->item->analysis.extra_attrs;
-	while ( attr_item ) {
-	  PangoAttribute* attr = attr_item->data;
-	  switch ( attr->klass->type ) {
-	  case PANGO_ATTR_FOREGROUND:
-	    {
-	      PangoColor color = ((PangoAttrColor*)attr)->color;
-	      VGfloat new_color[] = { (float)color.red / 65535.f,
-				      (float)color.green / 65535.f,
-				      (float)color.blue / 65535.f, 1.f };
-	      VGPaint new_paint = vgCreatePaint();
-	      vgSetParameterfv( new_paint, VG_PAINT_COLOR, 4, new_color );
-	      vgSetPaint( new_paint, VG_FILL_PATH );
-	      vgDestroyPaint( new_paint );
-	    }
-	    break;
-	  default:
-	    printf( "\tHmm. Unknown attribute: %d\n", attr->klass->type );
-	  }
-	  attr_item = attr_item->next;
-	}
-
-	// Note: inverted Y coordinate
-	VGfloat point[2] = { x_pixel, height - baseline_pixel };
-	vgSetfv( VG_GLYPH_ORIGIN, 2, point );
-	VGFont vg_font = vg_data->font;
-	int g;
-	for ( g = 0; g < run->glyphs->num_glyphs; g++ ) {
-	  vgDrawGlyph( vg_font, run->glyphs->glyphs[g].glyph, VG_FILL_PATH,
-		       VG_TRUE );
-	}
-
-	if ( vgGetPaint( VG_FILL_PATH ) != handle.d->foreground ) {
-	  vgSetPaint( handle.d->foreground, VG_FILL_PATH );
-	}
-      }
-      pango_fc_font_unlock_face( (PangoFcFont*)pg_font );
-    }
-  } while ( pango_layout_iter_next_run( li ) );
-  // Iterators are not free.
-  pango_layout_iter_free( li);
+  glEnable( GL_BLEND );
+  glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+  glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
+  glDisable( GL_BLEND );
 }
 
 void text_widget_free_handle ( struct TEXT_WIDGET_HANDLE handle )
@@ -261,166 +223,10 @@ void text_widget_free_handle ( struct TEXT_WIDGET_HANDLE handle )
     g_object_unref( handle.d->layout );
     g_object_unref( handle.d->context );
     g_object_unref( handle.d->font_map );
-    vgDestroyPaint( handle.d->foreground );
+    glDeleteTextures( 1, &handle.d->texture );
+    glDeleteVertexArrays( 1, &handle.d->VAO );
+    glDeleteProgram( handle.d->program );
     free( handle.d );
     handle.d = NULL;
   }
 }
-
-// \bug this really needs help, too.
-
-#define SEGMENTS_COUNT_MAX 256
-#define COORDS_COUNT_MAX 1024
-
-static VGuint segments_count;
-static VGubyte segments[SEGMENTS_COUNT_MAX];
-static VGuint coords_count;
-static VGfloat coords[COORDS_COUNT_MAX];
-
-
-// \bug unless we replace these arrays with vectors, we must
-// restore the assertions in some form.
-
-static void convert_contour ( const FT_Vector *points,
-			      const char *tags,
-			      short points_count )
-{
-   int first_coords = coords_count;
-
-   int first = 1;
-   char last_tag = 0;
-   int c = 0;
-
-   for (; points_count != 0; ++points, ++tags, --points_count) {
-      ++c;
-
-      char tag = *tags;
-      if (first) {
-         /* assert(tag & 0x1); */
-         /* assert(c==1); c=0; */
-         segments[segments_count++] = VG_MOVE_TO;
-         first = 0;
-      } else if (tag & 0x1) {
-         /* on curve */
-
-         if (last_tag & 0x1) {
-            /* last point was also on -- line */
-            /* assert(c==1); c=0; */
-            segments[segments_count++] = VG_LINE_TO;
-         } else {
-            /* last point was off -- quad or cubic */
-            if (last_tag & 0x2) {
-               /* cubic */
-               /* assert(c==3); c=0; */
-               segments[segments_count++] = VG_CUBIC_TO;
-            } else {
-               /* quad */
-               /* assert(c==2); c=0; */
-               segments[segments_count++] = VG_QUAD_TO;
-            }
-         }
-      } else {
-         /* off curve */
-
-         if (tag & 0x2) {
-            /* cubic */
-
-            /* assert((last_tag & 0x1) || (last_tag & 0x2)); /\* last either on or off and cubic *\/ */
-         } else {
-            /* quad */
-
-            if (!(last_tag & 0x1)) {
-               /* last was also off curve */
-
-               /* assert(!(last_tag & 0x2)); /\* must be quad *\/ */
-
-               /* add on point half-way between */
-               /* assert(c==2); c=1; */
-               segments[segments_count++] = VG_QUAD_TO;
-               VGfloat x = (coords[coords_count - 2] + float_from_26_6(points->x)) * 0.5f;
-               VGfloat y = (coords[coords_count - 1] + float_from_26_6(points->y)) * 0.5f;
-               coords[coords_count++] = x;
-               coords[coords_count++] = y;
-            }
-         }
-      }
-      last_tag = tag;
-
-      coords[coords_count++] = float_from_26_6(points->x);
-      coords[coords_count++] = float_from_26_6(points->y);
-   }
-
-   if (last_tag & 0x1) {
-      /* last point was also on -- line (implicit with close path) */
-      /* assert(c==0); */
-   } else {
-      ++c;
-
-      /* last point was off -- quad or cubic */
-      if (last_tag & 0x2) {
-         /* cubic */
-         /* assert(c==3); c=0; */
-         segments[segments_count++] = VG_CUBIC_TO;
-      } else {
-         /* quad */
-         /* assert(c==2); c=0; */
-         segments[segments_count++] = VG_QUAD_TO;
-      }
-
-      coords[coords_count++] = coords[first_coords + 0];
-      coords[coords_count++] = coords[first_coords + 1];
-   }
-
-   segments[segments_count++] = VG_CLOSE_PATH;
-}
-
-static void convert_outline ( const FT_Vector *points,
-			      const char *tags,
-			      const short *contours,
-			      short contours_count, short points_count )
-{
-  (void)points_count; // \bug unused, but it should be.
-   segments_count = 0;
-   coords_count = 0;
-
-   short last_contour = 0;
-   for (; contours_count != 0; ++contours, --contours_count) {
-      short contour = *contours + 1;
-      convert_contour(points + last_contour, tags + last_contour, contour - last_contour);
-      last_contour = contour;
-   }
-   /* assert(last_contour == points_count); */
-
-   /* assert(segments_count <= SEGMENTS_COUNT_MAX); /\* oops... we overwrote some memory *\/ */
-   /* assert(coords_count <= COORDS_COUNT_MAX); */
-}
-
-static void add_char ( VGFont font, FT_Face face, FT_ULong c )
-{
-  // Pango already provides us with the font index, not the glyph UNICODE
-  // point.
-
-  FT_Load_Glyph( face, c, FT_LOAD_DEFAULT );
-
-  FT_Outline *outline = &face->glyph->outline;
-
-  VGPath path;
-  path = vgCreatePath( VG_PATH_FORMAT_STANDARD, VG_PATH_DATATYPE_F,
-		       1.f, 0.f, 0, 0, VG_PATH_CAPABILITY_ALL );
-  // It could be a blank. If any character doesn't have a glyph, though,
-  // nothing is drawn by vgDrawGlyphs.
-  if ( outline->n_contours > 0 ) {
-    convert_outline( outline->points, outline->tags, outline->contours,
-		     outline->n_contours, outline->n_points );
-    vgAppendPathData( path, segments_count, segments, coords );
-  }
-
-  VGfloat origin[] = { 0.f, 0.f };
-  VGfloat escapement[] = { float_from_26_6(face->glyph->advance.x),
-			   float_from_26_6(face->glyph->advance.y) };
-
-  vgSetGlyphToPath( font, c, path, VG_TRUE, origin, escapement );
-
-  vgDestroyPath( path );
-}
-

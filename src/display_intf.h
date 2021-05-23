@@ -6,11 +6,18 @@
 
 struct MPD_HANDLE;
 struct IMAGE_DB_HANDLE;
+struct LOG_HANDLE;
 
 struct DISLPAY_PRIVATE;
 
 struct DISPLAY_HANDLE {
   struct DISPLAY_PRIVATE* d;
+};
+
+struct TOUCH_EVENT {
+    int action;
+    int x;
+    int y;
 };
 
 /*!
@@ -20,7 +27,8 @@ struct DISPLAY_HANDLE {
  * \return a handle to the display.
  */
 struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
-				     struct MPD_HANDLE mpd );
+				     struct MPD_HANDLE mpd,
+                                     struct LOG_HANDLE logger );
 /*!
  * The structure is opaque so every access has to be through
  * a function call.
@@ -37,4 +45,10 @@ void display_update ( struct DISPLAY_HANDLE handle );
  * \param[in] handle the display handle to close.
  */
 void display_close ( struct DISPLAY_HANDLE handle  );
+/*!
+ * Do something with a touch event.
+ * \param[in] handle our display.
+ */
+void display_dispatch_touch ( struct DISPLAY_HANDLE handle, 
+                              const struct TOUCH_EVENT* touch );
 #endif

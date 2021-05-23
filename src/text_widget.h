@@ -29,12 +29,16 @@ enum TEXT_WIDGET_ALIGNMENT {
  * \param[in] height_mm height in mm.
  * \param[in] dpmm_x dots per mm in the x direction.
  * \param[in] dpmm_y dots per mm in the y direction.
+ * \param[in] screen_width_mm width of screen in mm.
+ * \param[in] screen_height_mm height of screen in mm.
  */
 struct TEXT_WIDGET_HANDLE text_widget_init ( float x_mm, float y_mm,
 					     float width_mm,
 					     float height_mm,
 					     float dpmm_x,
-					     float dpmm_y );
+					     float dpmm_y,
+                                             float screen_width_mm,
+                                             float screen_height_mm );
 
 /*!
  * Set the text alignment.
@@ -45,15 +49,7 @@ void text_widget_set_alignment ( struct TEXT_WIDGET_HANDLE handle,
 				 enum TEXT_WIDGET_ALIGNMENT alignment );
 
 /*!
- * Set the default foreground color.
- * \param[inout] handle the text widget to update.
- * \param[in] color a four float, RGBA, color specification.
- */
-void text_widget_set_foreground( struct TEXT_WIDGET_HANDLE handle,
-				 float color[4] );
-
-/*!
- * Layout this text. Could have Pango markup to make it attractive.
+ * Layout this text. We expect it to have GTK markup.
  * \param[inout] handle the text widget.
  * \param[in] text the new string to display.
  * \param[in] length the number of bytes in text.

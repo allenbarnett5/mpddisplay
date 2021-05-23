@@ -82,21 +82,6 @@ int main ( int argc, char* argv[] )
       host = optarg;
       break;
     case 'p':
-#if 0
-      port = optarg;
-      {
-	int port_n = convert_int( optarg );
-	if ( errno != 0 ) {
-	  bad_argument = true;
-	  printf( "--port argument was not a valid integer: '%s' (%s)\n",
-		  optarg, strerror( errno ) );
-	}
-	if ( port_n <= 0 ) {
-	  bad_argument = true;
-	  printf( "--port argument must be positive (%s)\n", port );
-	}
-      }
-#else
       {
 	port = convert_int( optarg );
 	if ( errno != 0 ) {
@@ -109,7 +94,6 @@ int main ( int argc, char* argv[] )
 	  printf( "--port argument must be positive (%d)\n", port );
 	}
       }
-#endif
       break;
     case 'd':
       if ( *optarg == '\0' ) {
@@ -145,7 +129,8 @@ int main ( int argc, char* argv[] )
 
   // If we get this far, we can try to initialize the graphics.
 
-  main_data.display = display_init( main_data.image_db, main_data.mpd );
+  main_data.display = display_init( main_data.image_db, main_data.mpd,
+                                    main_data.logger );
 
   if ( display_status( main_data.display ) < 0 ) {
     return 1;
@@ -233,6 +218,10 @@ gboolean poll_mpd ( gpointer data )
   if ( mpd_changed( main_data->mpd, MPD_CHANGED_ANY ) ) {
     display_update( main_data->display );
     // \bug maybe check for error...
+    if ( display_status( main_data->display ) < 0 ) {
+      g_main_loop_quit( main_data->loop );
+      return FALSE;
+    }
   }
 
   return TRUE;
@@ -470,20 +459,21 @@ gboolean event_button_callback ( GIOChannel* gio,
 
   struct MAIN_DATA* main_data = data;
   struct LOG_HANDLE logger = main_data->logger;
-#if 0
-  gchar bytes[3];
-#else
   struct input_event event;
-#endif
+
   gsize bytes_read;
   GError* error = NULL;
   GIOStatus status;
+
+  static struct TOUCH_EVENT TOUCH;
 
   error = NULL;
 
   status = g_io_channel_read_chars( gio, (gchar*)&event, sizeof event,
 				    &bytes_read, &error );
-
+#if 0
+  log_message_warn( logger, "%d byte event", bytes_read );
+#endif
   if ( status == G_IO_STATUS_ERROR ) {
     log_message_warn( logger, "Error reading event: %s", error->message );
 
@@ -493,12 +483,13 @@ gboolean event_button_callback ( GIOChannel* gio,
     log_message_warn( logger, "Read event OK but no data" );
   }
   else {
+#if 0
     switch ( event.type ) {
     case EV_SYN:
-      log_message_warn( logger, "SYN %d [%d] event", event.code, event.value );
+      log_message_warn( logger, "SYN 0x%x [%d] event", event.code, event.value );
       break;
     case EV_KEY:
-      log_message_warn( logger, "KEY %d [%d] event", event.code, event.value );
+      log_message_warn( logger, "KEY 0x%x [%d] event", event.code, event.value );
       break;
     case EV_REL:
       log_message_warn( logger, "REL event" );
@@ -512,18 +503,47 @@ gboolean event_button_callback ( GIOChannel* gio,
       case ABS_Z:
 	log_message_warn( logger, "ABS Z [%d] event", event.value ); break;
       default:
-	log_message_warn( logger, "ABS %d [%d] event", event.code, event.value );
+	log_message_warn( logger, "ABS 0x%x [%d] event", event.code, event.value );
 	break;
       }
       break;
     case EV_MSC:
-      log_message_warn( logger, "MSC %d [%d] event", event.code, event.value );
+      log_message_warn( logger, "MSC 0x%x [%d] event", event.code, event.value );
       break;
     default:
-      log_message_warn( logger, "%d [%d [%d]] event", event.type, event.code,
+      log_message_warn( logger, "0x%x [0x%x [%d]] event", event.type, event.code,
 			event.value ); 
       break;
     }
+#else
+    // This is a budget state machine since each event appears one at
+    // a time.
+    switch ( event.type ) {
+    case EV_SYN:
+      if ( TOUCH.x < 400 ) {
+        display_dispatch_touch( main_data->display, &TOUCH );
+      }
+      else if ( TOUCH.action == -1 ) {
+        mpd_play_pause( main_data->mpd );
+      }
+      break;
+    case EV_KEY:
+      break;
+    case EV_ABS:
+      switch ( event.code ) {
+      case ABS_MT_TRACKING_ID:
+        TOUCH.action = event.value;
+        break;
+      case ABS_MT_POSITION_X:
+        TOUCH.x = event.value;
+        break;
+      case ABS_MT_POSITION_Y:
+        TOUCH.y = event.value;
+        break;
+      }
+      break;
+    }
+#endif
   }
 
   return TRUE;
@@ -538,7 +558,7 @@ void add_event ( gpointer data )
   GIOStatus status;
 
   guint ret;
-  char* event_file = "/dev/input/event0";
+  char* event_file = "/dev/input/event4";
   GError* error    = NULL;
 
   event = g_io_channel_new_file( event_file, "r", &error );
