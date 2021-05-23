@@ -14,6 +14,7 @@
 #include <linux/input.h>
 
 #include "glib.h"
+#include "gio/gio.h"
 
 #include "mpd_intf.h"
 #include "display_intf.h"
@@ -551,15 +552,56 @@ gboolean event_button_callback ( GIOChannel* gio,
 
 void add_event ( gpointer data )
 {
+
   struct MAIN_DATA* main_data = data;
   struct LOG_HANDLE logger = main_data->logger;
+  // The touch screen seems to get a different event every time.
+  // Perhaps the better solution is to look for the name in
+  // the /dev/input/by-path directory.
+  GError* error = NULL;
+  GFile* input_dir = g_file_new_for_path( "/dev/input/by-path" );
+  GFileEnumerator* dir_enum = g_file_enumerate_children( input_dir,
+                                                         "standard::*",
+                                                         G_FILE_QUERY_INFO_NONE,
+                                                         NULL,
+                                                         &error );
+  if ( dir_enum == NULL ) {
+    log_message_warn( logger, "Error reading directory: %s", error->message );
+
+    g_error_free( error );
+  }
+
+  // Scan the files in the directory.
+  GRegex* touch_rx = g_regex_new( "touchscreen", 0, 0, &error );
+  char* event_file = NULL;
+  while ( TRUE ) {
+    GFileInfo* info;
+    GFile* file;
+    if ( ! g_file_enumerator_iterate( dir_enum, &info, &file, NULL, &error ) ) {
+      goto done;
+    }
+    if ( ! info ) {
+      break;
+    }
+    event_file = g_file_get_path( file );
+    bool USE = false;
+    if ( g_regex_match( touch_rx, event_file, 0, NULL ) ) {
+      USE = true;
+    }
+    if ( USE ) {
+      break;
+    }
+    g_free( event_file );
+  }
+ done:
+  g_regex_unref( touch_rx );
+  g_object_unref( dir_enum );
+  g_object_unref( input_dir );
 
   GIOChannel* event;
   GIOStatus status;
 
   guint ret;
-  char* event_file = "/dev/input/event4";
-  GError* error    = NULL;
 
   event = g_io_channel_new_file( event_file, "r", &error );
 
@@ -572,6 +614,8 @@ void add_event ( gpointer data )
   else {
     log_message_info( logger, "Opened event \"%s\"", event_file );
   }
+
+  g_free( event_file );
 
   // The default encoding is UTF-8 and we're just reading binary
   // data.
