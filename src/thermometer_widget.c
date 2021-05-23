@@ -23,9 +23,6 @@ struct THERMOMETER_WIDGET_HANDLE thermometer_widget_init ( float x_mm, float y_m
 					       float screen_width_mm,
 					       float screen_height_mm )
 {
-  printf( "therm width: %f, height: %f\n", width_mm, height_mm );
-  printf( "screen width: %f, height: %f\n", screen_width_mm, screen_height_mm );
-
   struct THERMOMETER_WIDGET_HANDLE handle;
   handle.d = malloc( sizeof( struct THERMOMETER_WIDGET_PRIVATE ) );
 

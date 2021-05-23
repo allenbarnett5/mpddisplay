@@ -569,10 +569,19 @@ void add_event ( gpointer data )
     log_message_warn( logger, "Error reading directory: %s", error->message );
 
     g_error_free( error );
+    return;
   }
 
   // Scan the files in the directory.
   GRegex* touch_rx = g_regex_new( "touchscreen", 0, 0, &error );
+  if ( touch_rx == NULL ) {
+    log_message_warn( logger, "Error compiling regex: %s", error->message );
+
+    g_error_free( error );
+    g_object_unref( dir_enum );
+    return;
+  }
+  
   char* event_file = NULL;
   while ( TRUE ) {
     GFileInfo* info;
