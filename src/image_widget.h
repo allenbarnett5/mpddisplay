@@ -1,6 +1,5 @@
 /*
- * Display an image in a box. Possibly with an emblem of some type in
- * the corner.
+ * Display an image in a box.
  */
 #ifndef IMAGE_WIDGET_H
 #define IMAGE_WIDGET_H
@@ -11,13 +10,6 @@ struct IMAGE_WIDGET_PRIVATE;
 
 struct IMAGE_WIDGET_HANDLE {
   struct IMAGE_WIDGET_PRIVATE* d;
-};
-
-enum IMAGE_WIDGET_EMBLEM {
-  IMAGE_WIDGET_EMBLEM_STOPPED,
-  IMAGE_WIDGET_EMBLEM_PLAYING,
-  IMAGE_WIDGET_EMBLEM_PAUSED,
-  IMAGE_WIDGET_EMBLEM_NOEMBLEM
 };
 
 /*!
@@ -40,11 +32,6 @@ struct IMAGE_WIDGET_HANDLE image_widget_init ( float x_mm, float y_mm,
  */
 void image_widget_set_image ( struct IMAGE_WIDGET_HANDLE handle,
 			      struct IMAGE_HANDLE image );
-/*!
- * Draw an emblem of some kind in the corner of the image.
- */
-void image_widget_set_emblem ( struct IMAGE_WIDGET_HANDLE handle,
-			       enum IMAGE_WIDGET_EMBLEM emblem );
 /*!
  * Draw the image widget.
  */

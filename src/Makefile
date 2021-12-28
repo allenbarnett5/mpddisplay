@@ -9,7 +9,7 @@ CFLAGS = -g -Wall -Wextra -Wstrict-prototypes -MMD \
 -I /usr/include/gdk-pixbuf-2.0
 
 mpddisplay: main.o log_intf.o mpd_intf.o cover_image.o display_intf.o \
-text_widget.o image_widget.o thermometer_widget.o \
+text_widget.o image_widget.o thermometer_widget.o emblem_widget.o \
 image_intf.o no_cover.o empty_cover.o pattern.o ogles.o
 	gcc -o $@ $^ -g \
 -llog4c -lmpdclient -lsqlite3 \

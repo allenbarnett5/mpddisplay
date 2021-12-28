@@ -11,16 +11,11 @@
 #include "image_widget.h"
 
 struct IMAGE_WIDGET_PRIVATE {
-  enum IMAGE_WIDGET_EMBLEM emblem;
   GLuint texture;
   GLuint program;
   GLuint VAO;
 };
-#if 0
-static void image_widget_stopped ( void /*VGPaint color, VGPath path*/ );
-static void image_widget_playing ( void /*VGPaint color, VGPath path*/ );
-static void image_widget_paused  ( void /*VGPaint color, VGPath path*/ );
-#endif
+
 struct IMAGE_WIDGET_HANDLE image_widget_init ( float x_mm, float y_mm,
 					       float width_mm,
 					       float height_mm,
@@ -29,7 +24,6 @@ struct IMAGE_WIDGET_HANDLE image_widget_init ( float x_mm, float y_mm,
 {
   struct IMAGE_WIDGET_HANDLE handle;
   handle.d = malloc( sizeof( struct IMAGE_WIDGET_PRIVATE ) );
-  handle.d->emblem = IMAGE_WIDGET_EMBLEM_NOEMBLEM;
 
   const GLchar* vertex_shader_source =
     "#version 300 es       \n"
@@ -117,7 +111,7 @@ struct IMAGE_WIDGET_HANDLE image_widget_init ( float x_mm, float y_mm,
   glGenTextures( 1, &handle.d->texture );
   glBindTexture( GL_TEXTURE_2D, handle.d->texture );
   // The default is GL_NEAREST_MIPMAP_LINEAR. If you don't have a
-  // mipmap, you get nother. GL_LINEAR looks nicer than GL_NEAREST.
+  // mipmap, you get nothing. GL_LINEAR looks nicer than GL_NEAREST.
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 
   return handle;
@@ -160,56 +154,11 @@ void image_widget_set_image ( struct IMAGE_WIDGET_HANDLE handle,
 		GL_RGBA, GL_UNSIGNED_BYTE, image_data );
 }
 
-void image_widget_set_emblem ( struct IMAGE_WIDGET_HANDLE handle,
-			       enum IMAGE_WIDGET_EMBLEM emblem )
-{
-  if ( handle.d == NULL )
-    return;
-
-  handle.d->emblem = emblem;
-}
-
 void image_widget_draw_image ( struct IMAGE_WIDGET_HANDLE handle )
 {
   if ( handle.d == NULL )
     return;
 
-#if 0
-  if ( handle.d->emblem != IMAGE_WIDGET_EMBLEM_NOEMBLEM ) {
-    VGPath path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
-				VG_PATH_DATATYPE_F,
-				1.0f, 0.0f,
-				0, 0,
-				VG_PATH_CAPABILITY_ALL );
-    VGPaint color = vgCreatePaint();
-
-    vgSeti( VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE );
-    vgLoadIdentity();
-    // Draw in mm as usual.
-    vgScale( handle.d->dpmm_x, handle.d->dpmm_y );
-    // Move to the corner of the window.
-    vgTranslate( handle.d->x_mm, handle.d->y_mm );
-    // Drawing is generally in the lower right corner inside a 1 cm x 1 cm
-    // box.
-    vgTranslate( handle.d->width_mm - 10.f, 0.f );
-
-    switch ( handle.d->emblem ) {
-    case IMAGE_WIDGET_EMBLEM_STOPPED:
-      image_widget_stopped( /*color, path*/ );
-      break;
-    case IMAGE_WIDGET_EMBLEM_PLAYING:
-      image_widget_playing( /*color, path*/ );
-      break;
-    case IMAGE_WIDGET_EMBLEM_PAUSED:
-      image_widget_paused( /*color, path*/ );
-      break;
-    default:
-      break;
-    }
-  }
-#endif
-
-  // Needs some more work with respect to Emblems.
   glUseProgram( handle.d->program );
 
   glBindVertexArray( handle.d->VAO );
@@ -232,37 +181,3 @@ void image_widget_free_handle ( struct IMAGE_WIDGET_HANDLE handle )
   }
 }
 
-#if 0
-void image_widget_stopped ( void /*VGPaint color, VGPath path*/ )
-{
-  VGfloat octagon[] = { 5.f - 2.071f, 0.f,
-			5.f + 2.071f, 0.f,
-			10.f, 5.f - 2.071f,
-			10.f, 5.f + 2.071f,
-			5.f + 2.071f, 10.f,
-			5.f - 2.071f, 10.f,
-			0.f, 5.f + 2.071f,
-			0.f, 5.f - 2.071f, };
-  VGfloat foreground[] = { 1.f, 1.f, 1.f, 0.25f };
-  vgSetParameterfv( color, VG_PAINT_COLOR, 4, foreground );
-  vguPolygon( path, octagon, 8, VG_TRUE );
-}
-
-void image_widget_playing ( void /*VGPaint color, VGPath path*/ )
-{
-  VGfloat triangle[] = {  0.f,  0.f,
-			  0.f, 10.f,
-			 10.f,  5.f };
-  VGfloat foreground[] = { 1.f, 1.f, 1.f, 0.25f };
-  vgSetParameterfv( color, VG_PAINT_COLOR, 4, foreground );
-  vguPolygon( path, triangle, 3, VG_TRUE );
-}
-
-void image_widget_paused ( void /*VGPaint color, VGPath path*/ )
-{
-  VGfloat foreground[] = { 1.f, 1.f, 1.f, 0.25f };
-  vgSetParameterfv( color, VG_PAINT_COLOR, 4, foreground );
-  vguRect( path, 0.f, 0.f, 3.f, 10.f );
-  vguRect( path, 7.f, 0.f, 3.f, 10.f );
-}
-#endif

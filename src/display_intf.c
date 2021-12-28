@@ -24,28 +24,10 @@
 #include "image_intf.h"
 #include "log_intf.h"
 #include "display_intf.h"
+#include "emblem_widget.h"
 
 static const char* egl_carp ( void );
 
-#if 0
-static int window_width = 0;
-static int window_height = 0;
-// The basic decoration.
-static VGPath frame_path;
-// The background of the decoration.
-static VGPath background_path;
-// The basic decoration color.
-static VGPaint frame_paint;
-// The decoration brush image.
-static VGImage fg_brush;
-// The decoration background brush image.
-static VGImage bg_brush;
-
-static VGPath thermometer_path;
-static VGPaint thermometer_paint;
-// Background color and alpha
-static const VGfloat thermometer_color[] = { 0.f, 0.75f, 1.f, 0.3f };
-#endif
 // The frame texture is compiled into the code.
 extern const unsigned char _binary_pattern_png_start;
 extern const unsigned char _binary_pattern_png_end;
@@ -115,6 +97,8 @@ static const float dpmm_x = 800.f/tv_width;
 static const float dpmm_y = 480.f/tv_height;
 // Thermometer gap (mm).
 static const float thermometer_gap = 0.5f;
+// Emblem size (mm).
+static const float emblem_size = 10.f;
 #endif
 struct DISPLAY_PRIVATE {
   int status;
@@ -140,6 +124,8 @@ struct DISPLAY_PRIVATE {
   struct IMAGE_WIDGET_HANDLE cover_widget;
   // The thermometer widget.
   struct THERMOMETER_WIDGET_HANDLE thermometer_widget;
+  // The emblem widget.
+  struct EMBLEM_WIDGET_HANDLE emblem_widget;
   // Logger
   struct LOG_HANDLE logger;
 };
@@ -419,150 +405,24 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
     return handle;
   }
 
-#if 0
-  size_t pattern_size =
-    &_binary_pattern_png_end - &_binary_pattern_png_start;
-
-  struct IMAGE_HANDLE pattern = image_rgba_create( &_binary_pattern_png_start,
-						   pattern_size );
-
-  int pattern_width = image_rgba_width( pattern );
-  int pattern_height = image_rgba_height( pattern );
-  unsigned char* image = image_rgba_image( pattern );
-
-  fg_brush = vgCreateImage( VG_sRGBA_8888, pattern_width, pattern_height,
-			    VG_IMAGE_QUALITY_NONANTIALIASED );
-  vgImageSubData( fg_brush, image, pattern_width * 4,
-		  VG_sABGR_8888, 0, 0, pattern_width, pattern_height );
-
-  bg_brush = vgCreateImage( VG_sRGBA_8888, pattern_width, pattern_height,
-			    VG_IMAGE_QUALITY_NONANTIALIASED );
-
-  float darken[] = {
-    0.5, 0., 0., 0., // R-src -> {RGBA}-dest
-    0., 0.5, 0., 0., // G-src -> {RGBA}-dest
-    0., 0., 0.5, 0., // B-src -> {RGBA}-dest
-    0., 0., 0., 1., // A-src -> {RGBA}-dest
-    0., 0., 0., 0.  // const -> {RGBA}-dest
-  };
-
-  vgColorMatrix( bg_brush, fg_brush, darken );
-
-  vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
-  vgLoadIdentity();
-  vgScale( 0.1, 0.1 );
-
-  frame_paint = vgCreatePaint();
-  vgSetParameteri( frame_paint, VG_PAINT_TYPE, VG_PAINT_TYPE_PATTERN );
-  vgSetParameteri( frame_paint, VG_PAINT_PATTERN_TILING_MODE,
-		   VG_TILE_REPEAT );
-  image_rgba_free( pattern );
-
-  // Prepare to draw.
-  vgSeti( VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE );
-  vgLoadIdentity();
-  vgTranslate( vc_frame_x, vc_frame_y );
-  // We should be able to draw in mm and squares should be square.
-  vgScale( dpmm_x, dpmm_y );
-
-  // The background is a dark brushed metal.
-  background_path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
-				  VG_PATH_DATATYPE_F,
-				  1.0f, 0.0f,
-				  0, 0,
-				  VG_PATH_CAPABILITY_ALL );
-  vguRect( background_path, 0.f, 0.f, tv_width, tv_height );
-
-  vgSetPaint( frame_paint, VG_FILL_PATH );
-
-  vgPaintPattern( frame_paint, bg_brush );
-
-  vgDrawPath( background_path, VG_FILL_PATH );
-
-  // Define the main frame.
-  frame_path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
-			     VG_PATH_DATATYPE_F,
-			     1.0f, 0.0f,
-			     0, 0,
-			     VG_PATH_CAPABILITY_ALL );
-
-  vguRect( frame_path, 0.f, 0.f, tv_width, tv_height );
-
-  // Metadata box.
-  vguRoundRect( frame_path,
-	   border_thickness,
-	   border_thickness,
-	   tv_width / 2.f - 1.5f * border_thickness,
-	   tv_height - 2.f * border_thickness,
-	   round_radius, round_radius );
-
-  // Image box.
-#endif
   float image_edge_length = tv_width / 2.f - 1.5 * border_thickness;
-  // This should really be a function of the font height.
-  float therm_height = 2.f * font_size_mm;
-#if 0
-  vguRoundRect( frame_path,
-	   tv_width / 2.f + border_thickness / 2.f,
-	   tv_height - border_thickness - image_edge_length,
-	   image_edge_length,
-	   image_edge_length,
-	   round_radius, round_radius
-	   );
 
-  // Thermometer box.
-
-
-  float therm_width  = image_edge_length;
-  float therm_x      = tv_width / 2.f + border_thickness / 2.f;
-  float therm_y      = border_thickness;
-
-  vguRoundRect( frame_path,
-		therm_x,
-		therm_y,
-		therm_width,
-		therm_height,
-		round_radius, round_radius );
-
-  vgSetPaint( frame_paint, VG_FILL_PATH );
-
-  vgPaintPattern( frame_paint, fg_brush );
-
-  vgDrawPath( frame_path, VG_FILL_PATH );
-
-  thermometer_path = vgCreatePath( VG_PATH_FORMAT_STANDARD,
-				   VG_PATH_DATATYPE_F,
-				   1.0f, 0.0f,
-				   0, 0,
-				   VG_PATH_CAPABILITY_ALL );
-
-  thermometer_paint = vgCreatePaint();
-
-  vgSeti( VG_MATRIX_MODE, VG_MATRIX_FILL_PAINT_TO_USER );
-  vgLoadIdentity();
-
-  vgSetParameteri( thermometer_paint, VG_PAINT_TYPE, VG_PAINT_TYPE_LINEAR_GRADIENT );
-  VGfloat gradient_points[] = { 0.f, border_thickness,
-				0.f, border_thickness + therm_height };
-  vgSetParameterfv( thermometer_paint, VG_PAINT_LINEAR_GRADIENT,
-		    4, gradient_points );
-  float fill_stops[] = {
-    0., 0., 0.75, 1., 0.01,
-    0.25, 0., 0.75, 1., 0.7,
-    0.5, 0., 0.75, 1., 0.3,
-    1., 0., 0.75, 1., 0.0,
-  };
-  vgSetParameterfv( thermometer_paint, VG_PAINT_COLOR_RAMP_STOPS,
-		    4 * 5, fill_stops );
-#endif
   handle.d->metadata_widget =
     text_widget_init( border_thickness, border_thickness,
 		      tv_width / 2.f - 1.5f * border_thickness,
 		      tv_height - 2.f * border_thickness,
 		      dpmm_x, dpmm_y, tv_width, tv_height );
 
+  handle.d->emblem_widget =
+    emblem_widget_init( tv_width / 2.f - emblem_size - border_thickness,
+                        border_thickness,
+                        emblem_size, emblem_size,
+                        tv_width, tv_height );
+
   // \bug widget height is a judgement text_widget should really
   // have a vertical centering option.
+  // This should really be a function of the font height.
+  float therm_height = 2.f * font_size_mm;
   handle.d->time_widget =
     text_widget_init( tv_width / 2.f + border_thickness / 2.f,
 		      border_thickness,
@@ -702,25 +562,25 @@ void display_update ( struct DISPLAY_HANDLE handle )
 
   if ( mpd_changed( handle.d->mpd, MPD_CHANGED_STATUS ) ) {
     enum MPD_PLAY_STATUS status = mpd_play_status( handle.d->mpd );
-    enum IMAGE_WIDGET_EMBLEM emblem = IMAGE_WIDGET_EMBLEM_NOEMBLEM;
+    enum EMBLEM_WIDGET_EMBLEM emblem = EMBLEM_WIDGET_EMBLEM_NOEMBLEM;
     switch ( status ) {
     case MPD_PLAY_STATUS_STOPPED:
       if ( strlen( mpd_artist( handle.d->mpd ) ) == 0 ||
 	   strlen( mpd_album( handle.d->mpd ) ) == 0 ) {
-	emblem = IMAGE_WIDGET_EMBLEM_NOEMBLEM;
+	emblem = EMBLEM_WIDGET_EMBLEM_NOEMBLEM;
       }
       else {
-	emblem = IMAGE_WIDGET_EMBLEM_STOPPED;
+	emblem = EMBLEM_WIDGET_EMBLEM_STOPPED;
       }
       break;
     case MPD_PLAY_STATUS_PLAYING:
-      emblem = IMAGE_WIDGET_EMBLEM_PLAYING; break;
+      emblem = EMBLEM_WIDGET_EMBLEM_PLAYING; break;
     case MPD_PLAY_STATUS_PAUSED:
-      emblem = IMAGE_WIDGET_EMBLEM_PAUSED; break;
+      emblem = EMBLEM_WIDGET_EMBLEM_PAUSED; break;
     default:
       break;
     }
-    image_widget_set_emblem( handle.d->cover_widget, emblem );
+    emblem_widget_set_emblem( handle.d->emblem_widget, emblem );
   }
 #if 0
   glViewport( 0, 0, 500, 500 );
@@ -737,6 +597,7 @@ void display_update ( struct DISPLAY_HANDLE handle )
   image_widget_draw_image( handle.d->cover_widget );
   thermometer_widget_draw_thermometer( handle.d->thermometer_widget );
   text_widget_draw_text( handle.d->time_widget );
+  emblem_widget_draw_emblem( handle.d->emblem_widget );
 
 #if 0
   vgSeti( VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE );

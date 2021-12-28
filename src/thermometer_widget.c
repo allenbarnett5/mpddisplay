@@ -77,24 +77,15 @@ struct THERMOMETER_WIDGET_HANDLE thermometer_widget_init ( float x_mm, float y_m
   GLuint mv_matrix_u = glGetUniformLocation( handle.d->program, "mv_matrix" );
   handle.d->scale_u  = glGetUniformLocation( handle.d->program, "scale" );
 
-  // We draw in mm.
-#if 0
-  GLfloat mv_matrix[] = {
-                         2.f/screen_width_mm, 0.f, 0.f, 0.f,
-                         0.f, 2.f/screen_height_mm, 0.f, 0.f,
-                         0.f, 0.f, 1.f, 0.f,
-                         -1.f, -1.f, 0.f, 1.f
-  };
-#else
   // Include the translation (in mm) of the thermometer in the
   // modelview operation.
   GLfloat mv_matrix[] = {
      2.f/screen_width_mm,          0.f,                          0.f, 0.f,
      0.f,                          2.f/screen_height_mm,         0.f, 0.f,
      0.f,                          0.f,                          1.f, 0.f,
-     2.f*x_mm/screen_width_mm-1.f, 2.f*y_mm/screen_width_mm-1.f, 0.f, 1.f
+     2.f*x_mm/screen_width_mm-1.f, 2.f*y_mm/screen_height_mm-1.f, 0.f, 1.f
   };
-#endif
+
   glUniform1f( handle.d->scale_u, 0.f );
   glUniformMatrix4fv( mv_matrix_u, 1, GL_FALSE, mv_matrix );
 

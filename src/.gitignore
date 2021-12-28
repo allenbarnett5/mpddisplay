@@ -1,2 +1,5 @@
+mpddisplay
+album_art.sqlite3
+*~
 *.o
 *.d
