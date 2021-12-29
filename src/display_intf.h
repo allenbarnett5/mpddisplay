@@ -15,9 +15,9 @@ struct DISPLAY_HANDLE {
 };
 
 struct TOUCH_EVENT {
-    int action;
-    int x;
-    int y;
+  int updown;
+  int x;
+  int y;
 };
 
 /*!

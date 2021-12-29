@@ -521,20 +521,20 @@ gboolean event_button_callback ( GIOChannel* gio,
     // a time.
     switch ( event.type ) {
     case EV_SYN:
-      if ( TOUCH.x < 400 ) {
-        display_dispatch_touch( main_data->display, &TOUCH );
-      }
-      else if ( TOUCH.action == -1 ) {
-        mpd_play_pause( main_data->mpd );
+      if ( TOUCH.updown == 1 ) {
+        if ( TOUCH.x < 400 ) {
+          display_dispatch_touch( main_data->display, &TOUCH );
+        }
+        else {
+          mpd_play_pause( main_data->mpd );
+        }
       }
       break;
     case EV_KEY:
+      TOUCH.updown = event.value;
       break;
     case EV_ABS:
       switch ( event.code ) {
-      case ABS_MT_TRACKING_ID:
-        TOUCH.action = event.value;
-        break;
       case ABS_MT_POSITION_X:
         TOUCH.x = event.value;
         break;

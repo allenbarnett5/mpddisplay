@@ -705,11 +705,15 @@ void display_close ( struct DISPLAY_HANDLE handle )
 void display_dispatch_touch ( struct DISPLAY_HANDLE handle,
                               const struct TOUCH_EVENT* touch )
 {
-  (void)handle;
   int brightness = 255 * ( 1.f - (float)touch->y/480.f );
   FILE* f = fopen( "/sys/class/backlight/rpi_backlight/brightness", "w" );
-  fprintf( f, "%d", brightness );
-  fclose(f);
+  if ( f ) {
+    fprintf( f, "%d", brightness );
+    fclose(f);
+  }
+  else {
+    log_message_warn( handle.d->logger, "Could not open backlight brightness file: %s", strerror( errno ) );
+  }
 }
 
 static const char* egl_carp ( void )
