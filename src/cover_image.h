@@ -1,8 +1,7 @@
 /*
  * Get an album cover image from a database.
  */
-#ifndef COVER_IMAGE_H
-#define COVER_IMAGE_H
+#pragma once
 
 struct IMAGE_HANDLE;
 struct IMAGE_DB_PRIVATE;
@@ -20,4 +19,3 @@ struct IMAGE_HANDLE cover_image ( struct IMAGE_DB_HANDLE handle,
 				  const char* album );
 
 void image_db_free ( struct IMAGE_DB_HANDLE handle );
-#endif

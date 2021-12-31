@@ -2,8 +2,7 @@
  * Display the text in the given box. Text may use the Pango markup
  * to achieve tasteful effects.
  */
-#ifndef TEXT_WIDGET_H
-#define TEXT_WIDGET_H
+#pragma once
 
 struct TEXT_WIDGET_PRIVATE;
 
@@ -69,4 +68,3 @@ void text_widget_draw_text ( struct TEXT_WIDGET_HANDLE handle );
  * Release any memory held by the handle.
  */
 void text_widget_free_handle ( struct TEXT_WIDGET_HANDLE handle );
-#endif

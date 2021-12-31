@@ -1,8 +1,7 @@
 /*
  * Wrap the image handling library in another layer.
  */
-#ifndef IMAGE_INTF_H
-#define IMAGE_INTF_H
+#pragma once
 
 struct IMAGE_HANDLE {
   struct IMAGE_HANDLE_PRIVATE* d;
@@ -40,5 +39,3 @@ int image_rgba_height ( struct IMAGE_HANDLE handle );
  * the little endian nature of this chip.
  */
 unsigned char* image_rgba_image ( struct IMAGE_HANDLE handle );
-
-#endif

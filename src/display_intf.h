@@ -1,8 +1,7 @@
 /*
  * Encapsulate the interaction with the Pi's display.
  */
-#ifndef DISPLAY_INTF_H
-#define DISPLAY_INTF_H
+#pragma once
 
 struct MPD_HANDLE;
 struct IMAGE_DB_HANDLE;
@@ -51,4 +50,3 @@ void display_close ( struct DISPLAY_HANDLE handle  );
  */
 void display_dispatch_touch ( struct DISPLAY_HANDLE handle, 
                               const struct TOUCH_EVENT* touch );
-#endif

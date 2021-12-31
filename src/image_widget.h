@@ -1,8 +1,7 @@
 /*
  * Display an image in a box.
  */
-#ifndef IMAGE_WIDGET_H
-#define IMAGE_WIDGET_H
+#pragma once
 
 #include "image_intf.h"
 
@@ -41,6 +40,3 @@ void image_widget_draw_image ( struct IMAGE_WIDGET_HANDLE handle );
  * Release any memory held by the handle.
  */
 void image_widget_free_handle ( struct IMAGE_WIDGET_HANDLE handle );
-
-
-#endif

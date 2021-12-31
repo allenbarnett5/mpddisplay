@@ -2,8 +2,7 @@
  * Encapsulate the interaction with MPD. Because this is a network
  * application, there is a lot which can go wrong.
  */
-#ifndef MPD_INTF_H
-#define MPD_INTF_H
+#pragma once
 
 #include <stdbool.h>
 #include <time.h>
@@ -111,4 +110,3 @@ struct MPD_TIMES mpd_times ( const struct MPD_HANDLE handle );
  * Toggle the playing / paused state.
  */
 void mpd_play_pause ( struct MPD_HANDLE handle );
-#endif

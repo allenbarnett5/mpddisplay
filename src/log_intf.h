@@ -2,8 +2,7 @@
  * Try to wrap a logging library. The presence of convenient stdarg
  * functions makes this a little tricky.
  */
-#ifndef LOG_INTF_H
-#define LOG_INTF_H
+#pragma once
 
 struct LOG_PRIVATE;
 
@@ -43,4 +42,3 @@ int log_message_error ( struct LOG_HANDLE handle, const char* message, ... );
  * \return 0 if everything went ok, -1 otherwise.
  */
 int log_close ( struct LOG_HANDLE handle );
-#endif

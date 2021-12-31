@@ -1,8 +1,7 @@
 /*
  * Display a thermometer.
  */
-#ifndef THERMOMETER_WIDGET_H
-#define THERMOMETER_WIDGET_H
+#pragma once
 
 struct THERMOMETER_WIDGET_PRIVATE;
 
@@ -40,6 +39,3 @@ void thermometer_widget_draw_thermometer ( struct THERMOMETER_WIDGET_HANDLE hand
  * Release any memory held by the handle.
  */
 void thermometer_widget_free_handle ( struct THERMOMETER_WIDGET_HANDLE handle );
-
-
-#endif
