@@ -37,7 +37,7 @@ struct THERMOMETER_WIDGET_HANDLE thermometer_widget_init ( float x_mm, float y_m
     "out vec2 corner;\n"
     "out vec3 color;\n"
     "void main(void) {\n"
-    "  gl_Position = mv_matrix * vec4( scale* vertex.x, vertex.y, 0., 1. );\n"
+    "  gl_Position = mv_matrix * vec4( /*scale**/ vertex.x, vertex.y, 0., 1. );\n"
     "  corner      = corneruv;\n"
     "  color       = coloruv;\n"
     "}";
@@ -49,7 +49,12 @@ struct THERMOMETER_WIDGET_HANDLE thermometer_widget_init ( float x_mm, float y_m
     "in vec2 corner;\n"
     "in vec3 color;\n"
     "out vec4 fragColor;\n"
+    "void sdBox ( in vec2 p, in vec2 b, out float d ) {\n"
+    "  vec2 r = abs(p) - b;\n"
+    "  d = length(max(r,0.)) + min(max(r.x,r.y),0.);\n"
+    "}\n"
     "void main(void) {\n"
+#if 0
     "  const float W = 74.54;\n"
     "  const float H = 6.38;\n"
     "  const float R = 2.f;\n"
@@ -64,6 +69,18 @@ struct THERMOMETER_WIDGET_HANDLE thermometer_widget_init ( float x_mm, float y_m
     "    alpha = 1.f - smoothstep( R-grad, R, d_len );\n"
     "  }\n"
     "  fragColor.rgba = vec4( color, alpha );\n"
+#else
+    "  const float EPS = 0.125f;\n"
+    "  // Are these values just half of W and H?\n"
+    "  const float W = 74.;\n"
+    "  const float H = 6.;\n"
+    "  const vec2 b = vec2( 0.5*W, 0.5*H );\n"
+    "  float d;\n"
+    "  sdBox( corner, b, d );\n"
+    "  vec3 meter = corner.x + 0.5*W < scale * W ? color : vec3(.2);\n"
+    "  vec3 col = abs(d) < EPS ? vec3(1.) : meter;\n"
+    "  fragColor.rgba = vec4( col, 1.f );\n"
+#endif
     "}";
 
   handle.d->program = OGLEScreateProgram( vertex_shader_source,
@@ -139,10 +156,17 @@ struct THERMOMETER_WIDGET_HANDLE thermometer_widget_init ( float x_mm, float y_m
   // Corner uv.
   GLfloat square_corneruvs[4][2] =
     {
+#if 0
      { -1.f, -1.f },
      {  1.f, -1.f },
      {  1.f,  1.f },
      { -1.f,  1.f },
+#else
+     { -0.5f*width_mm, -0.5f*height_mm },
+     {  0.5f*width_mm, -0.5f*height_mm },
+     {  0.5f*width_mm,  0.5f*height_mm },
+     { -0.5f*width_mm,  0.5f*height_mm },
+#endif
     };
   glBindBuffer( GL_ARRAY_BUFFER, corneruv_buffer );
   glVertexAttribPointer( corneruv_attr, 2, GL_FLOAT, GL_FALSE,

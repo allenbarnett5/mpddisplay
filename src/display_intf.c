@@ -425,7 +425,7 @@ struct DISPLAY_HANDLE display_init ( struct IMAGE_DB_HANDLE image_db,
   float therm_height = 2.f * font_size_mm;
   handle.d->time_widget =
     text_widget_init( tv_width / 2.f + border_thickness / 2.f,
-		      border_thickness,
+		      2.f * border_thickness,
 		      image_edge_length, therm_height - border_thickness,
 		      dpmm_x, dpmm_y, tv_width, tv_height );
 
